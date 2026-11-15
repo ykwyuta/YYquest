@@ -42,6 +42,11 @@ mod web {
     }
 
     #[no_mangle]
+    extern "C" fn is_title() -> bool {
+        SESSION.with(|session| matches!(session.borrow().0.scene, crate::game::Scene::Title))
+    }
+
+    #[no_mangle]
     extern "C" fn key(code: u32) {
         if let Some(key) = Key::from_code(code) {
             SESSION.with(|session| session.borrow_mut().0.input(key));

@@ -8,6 +8,8 @@ const image = buffer.createImageData(width, height);
 const decoder = new TextDecoder();
 const status = document.querySelector("#status");
 const controls = document.querySelector("#controls");
+const refreshButton = document.querySelector("#cache-refresh");
+const refreshParam = "_yyrefresh";
 const keys = new Map([
   ["ArrowUp", 38], ["ArrowDown", 40], ["ArrowLeft", 37], ["ArrowRight", 39],
   ["KeyW", 38], ["KeyS", 40], ["KeyA", 37], ["KeyD", 39],
@@ -38,8 +40,70 @@ const screen = {
   },
 };
 
+function wasmUrl(page) {
+  const url = new URL("./yyquest.wasm", import.meta.url);
+  const token = page.searchParams.get(refreshParam);
+  if (token) url.searchParams.set(refreshParam, token);
+  return url;
+}
+
+function showStatus(message) {
+  status.textContent = message;
+  status.hidden = false;
+}
+
+refreshButton.addEventListener("click", async () => {
+  refreshButton.disabled = true;
+  showStatus("ゲームファイルを取得し直しています…");
+
+  try {
+    const next = new URL(location.href);
+    next.searchParams.set(refreshParam, Date.now().toString(36));
+    const files = [
+      next,
+      new URL("./index.html", import.meta.url),
+      new URL("./main.js", import.meta.url),
+      new URL("./game.css", import.meta.url),
+      wasmUrl(next),
+    ];
+    if ("caches" in window) {
+      try {
+        const paths = new Set([...files, new URL("./", import.meta.url)]
+          .map(({ origin, pathname }) => origin + pathname));
+        for (const name of await caches.keys()) {
+          const cache = await caches.open(name);
+          for (const request of await cache.keys()) {
+            const { origin, pathname } = new URL(request.url);
+            if (paths.has(origin + pathname)) await cache.delete(request);
+          }
+        }
+      } catch (error) {
+        console.warn("ゲームのキャッシュを開けませんでした。", error);
+      }
+    }
+
+    await Promise.all(files.map(async (url) => {
+      const response = await fetch(url, { cache: "reload" });
+      if (!response.ok) throw new Error(`Reload failed (${response.status}): ${url.pathname}`);
+      await response.arrayBuffer();
+    }));
+    location.replace(next.href);
+  } catch (error) {
+    refreshButton.disabled = false;
+    showStatus("再読み込みできませんでした。通信状態を確認して、もう一度お試しください。");
+    console.warn(error);
+  }
+});
+
+function sendKey(key) {
+  if (!wasm || refreshButton.disabled) return;
+  wasm.key(key);
+  refreshButton.hidden = !wasm.is_title();
+  if (refreshButton.hidden) status.hidden = true;
+}
+
 try {
-  const response = await fetch(new URL("./yyquest.wasm", import.meta.url));
+  const response = await fetch(wasmUrl(new URL(location.href)));
   if (!response.ok) throw new Error(`Wasm download failed (${response.status})`);
   const { instance } = await WebAssembly.instantiate(await response.arrayBuffer(), { screen });
   wasm = instance.exports;
@@ -47,9 +111,10 @@ try {
   status.hidden = true;
   controls.hidden = false;
 } catch (error) {
-  status.textContent = "ゲームを読み込めませんでした。ページを再読み込みしてください。";
+  showStatus("ゲームを読み込めませんでした。「キャッシュを消して再読み込み」をお試しください。");
   console.error(error);
 }
+refreshButton.hidden = false;
 
 window.addEventListener("keydown", (event) => {
   if (!wasm || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
@@ -57,10 +122,10 @@ window.addEventListener("keydown", (event) => {
   const key = keys.get(event.code);
   if (key === undefined) return;
   event.preventDefault();
-  if (!event.repeat || (key >= 37 && key <= 40)) wasm.key(key);
+  if (!event.repeat || (key >= 37 && key <= 40)) sendKey(key);
 });
 
 controls.addEventListener("click", (event) => {
   const button = event.target.closest("button");
-  if (button) wasm?.key(Number(button.dataset.key));
+  if (button) sendKey(Number(button.dataset.key));
 });
