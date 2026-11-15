@@ -1,0 +1,12 @@
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/main.js
+  Content-Type: text/javascript; charset=utf-8
+  Cache-Control: no-cache
+/game.css
+  Cache-Control: no-cache
+/yyquest.wasm
+  Content-Type: application/wasm
+  Cache-Control: no-cache

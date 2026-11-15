@@ -1,1 +1,43 @@
-# YYquest
+# 残響のアルカディア（仮）
+
+ファミコン時代のコマンド式 RPG を目指す Rust プロジェクトです。最初の試遊版「辺境の残響」では、アレンが黄昏の辺境領ノクスの村を出て、森でリリスと出会い、北の石碑にたどり着きます。
+
+## 遊び方
+
+矢印キーまたは WASD で移動し、Enter、Space、Z で決定します。J でアレンの手記を開き、Esc または J で閉じます。ブラウザのタッチ端末では画面下のボタンを使えます。
+
+村のかまどで体力を回復できます。街道を外れて草むらを歩くと魔物が出ます。戦闘では上下でコマンドを選びます。刻印魔法は大きなダメージを与え、手記に記された思い出を一つ失います。リリスが仲間になると精霊共鳴を使えます。
+
+## Windows
+
+Rust と MSVC ビルド環境で実行します。
+
+```powershell
+cargo run --locked --release --bin yyquest-win
+```
+
+## WebAssembly
+
+Rust と Node.js を使います。ローカル配信の例は Python を使用します。
+
+```powershell
+rustup target add wasm32-unknown-unknown
+node tools/build.mjs
+python -m http.server 8765 --bind 127.0.0.1 --directory dist
+```
+
+[ローカルのゲーム画面](http://127.0.0.1:8765/)を開きます。
+
+## Cloudflare
+
+[YYDungeon の公開手順](https://github.com/ykwyuta/YYDungeon#cloudflare-配信)と同様、Cloudflare Workers の Static Assets で `dist` を配信します。Workers の Git 連携ではリポジトリ直下をルートに設定し、デプロイコマンドを `npx wrangler deploy` にします。`wrangler.toml` に指定した `bash build.sh` が `dist` を生成します。Pages を使う場合はビルドコマンドを `bash build.sh`、出力先を `dist` にします。
+
+## 実装と素材
+
+ゲーム進行と 320×240 の画面描画は Windows と WebAssembly で共有します。Windows は Win32/GDI、ブラウザは Canvas 2D に描画します。キャラクターと敵の素材の出典は [assets/README.md](assets/README.md) を参照してください。
+
+```powershell
+cargo test --locked --lib
+node tools/build.mjs
+node tools/wasm-smoke.mjs
+```
