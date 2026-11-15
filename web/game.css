@@ -18,6 +18,8 @@ canvas {
   image-rendering: pixelated;
 }
 #status { margin: 16px 0 0; text-align: center; }
+#cache-refresh:not([hidden]) { display: block; margin: 14px 0 0 auto; }
+#cache-refresh:disabled { opacity: 0.65; cursor: wait; }
 #controls:not([hidden]) {
   display: flex;
   justify-content: space-between;

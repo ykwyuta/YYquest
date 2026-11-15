@@ -147,19 +147,20 @@ impl Frame {
             self.art(LILITH, 15 + x * 16, 23 + y * 16, 18);
         }
         self.art(ALLEN, 15 + game.x * 16, 23 + game.y * 16, 18);
-        self.panel(15, 191, 290, 37);
-        let objective = if game.lilith {
-            "リリスと北の石碑へ。"
-        } else {
-            "東の森へ。村のかまどで体力を回復できます。"
-        };
-        self.label(24, 196, 11, IVORY, objective);
-        self.label(24, 214, 9, MIST, "矢印 / WASD  移動     J  手記");
         if let Some([first, second]) = game.message {
             self.panel(15, 174, 290, 55);
             self.label(24, 180, 11, IVORY, first);
             self.label(24, 196, 11, IVORY, second);
             self.label(249, 213, 9, GOLD, "▼ 決定");
+        } else {
+            self.panel(15, 191, 290, 37);
+            let objective = if game.lilith {
+                "リリスと北の石碑へ。"
+            } else {
+                "東の森へ。村のかまどで体力を回復できます。"
+            };
+            self.label(24, 196, 11, IVORY, objective);
+            self.label(24, 214, 9, MIST, "矢印 / WASD  移動     J  手記");
         }
         if game.journal {
             self.labels.truncate(2);
