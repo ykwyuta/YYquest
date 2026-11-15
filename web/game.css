@@ -1,0 +1,58 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  background: #0c0e19;
+  color: #cab9ce;
+  font-family: "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif;
+}
+main { width: min(640px, calc(100% - 24px)); padding-block: 12px; }
+canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #111524;
+  outline: 1px solid #725971;
+  image-rendering: pixelated;
+}
+#status { margin: 16px 0 0; text-align: center; }
+#controls:not([hidden]) {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  margin-top: 14px;
+}
+.directions {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  grid-template-areas: ". up ." "left down right";
+  gap: 5px;
+}
+.up { grid-area: up; }
+.left { grid-area: left; }
+.down { grid-area: down; }
+.right { grid-area: right; }
+.actions { display: flex; gap: 6px; }
+button {
+  appearance: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #725971;
+  border-radius: 2px;
+  background: #241f31;
+  color: #f6e9cf;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button.confirm { border-color: #f0bd75; color: #f0bd75; }
+button:active { background: #49364c; }
+button:focus-visible { outline: 2px solid #95d5b4; outline-offset: 2px; }
+@media (pointer: fine) and (min-width: 700px) {
+  #controls:not([hidden]) { display: none; }
+}

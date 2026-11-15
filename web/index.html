@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111524">
+  <title>残響のアルカディア</title>
+  <link rel="stylesheet" href="./game.css">
+  <script type="module" src="./main.js"></script>
+</head>
+<body>
+  <main>
+    <canvas id="game" width="640" height="480" aria-label="残響のアルカディア"></canvas>
+    <p id="status" role="status">読み込み中…</p>
+    <div id="controls" aria-label="ゲーム操作" hidden>
+      <div class="directions">
+        <button class="up" data-key="38" aria-label="上">↑</button>
+        <button class="left" data-key="37" aria-label="左">←</button>
+        <button class="down" data-key="40" aria-label="下">↓</button>
+        <button class="right" data-key="39" aria-label="右">→</button>
+      </div>
+      <div class="actions">
+        <button data-key="74">手記</button>
+        <button class="confirm" data-key="13">決定</button>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

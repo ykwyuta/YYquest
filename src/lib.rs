@@ -1,0 +1,51 @@
+pub mod game;
+pub mod render;
+
+#[cfg(target_arch = "wasm32")]
+mod web {
+    use crate::{
+        game::{Game, Key},
+        render::Frame,
+    };
+    use std::cell::RefCell;
+
+    #[link(wasm_import_module = "screen")]
+    extern "C" {
+        fn bitmap(pixels: *const u32);
+        fn text(x: i32, y: i32, size: i32, color: u32, utf8: *const u8, len: usize);
+    }
+
+    thread_local! {
+        static SESSION: RefCell<(Game, Frame)> = RefCell::new((Game::new(), Frame::new()));
+    }
+
+    #[no_mangle]
+    extern "C" fn draw() {
+        SESSION.with(|session| {
+            let mut session = session.borrow_mut();
+            let (game, frame) = &mut *session;
+            frame.draw(game);
+            unsafe { bitmap(frame.pixels.as_ptr()) };
+            for label in &frame.labels {
+                unsafe {
+                    text(
+                        label.x,
+                        label.y,
+                        label.size,
+                        label.color,
+                        label.text.as_ptr(),
+                        label.text.len(),
+                    );
+                }
+            }
+        });
+    }
+
+    #[no_mangle]
+    extern "C" fn key(code: u32) {
+        if let Some(key) = Key::from_code(code) {
+            SESSION.with(|session| session.borrow_mut().0.input(key));
+            draw();
+        }
+    }
+}
