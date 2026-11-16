@@ -1,4 +1,4 @@
-use crate::dialogue::{Expression::*, Portrait, Speaker::*};
+use crate::dialogue::{Delivery, Expression::*, Speaker::*};
 
 #[derive(Clone, Copy)]
 pub(crate) struct ChapterBeat {
@@ -6,39 +6,39 @@ pub(crate) struct ChapterBeat {
     pub place: Option<usize>,
     pub title: &'static str,
     pub text: &'static str,
-    pub face: Portrait,
+    pub delivery: Delivery,
 }
 
 const CHAPTER: [ChapterBeat; 6] = [
     ChapterBeat {
         site: 0, place: Some(1), title: "途切れた帰還簿",
-        text: "これがガウェインの帰還簿だ。同じ旗が二度帰ってるのに、片方は人数が削られてる。欄外に三つ灯の印があるだろう。霧灯の港の信号台で聞いてみな。",
-        face: Portrait::new(Hearth, Thoughtful),
+        text: "これが父さんの帰還簿だよ。ほら、同じ旗が二度戻ったと書いてある。二度目は人数だけ削ってあるね。欄外の三つの灯……霧灯の港の信号台で、灯台守に聞いてみな。",
+        delivery: Delivery::spoken("炉番", Hearth, Thoughtful),
     },
     ChapterBeat {
         site: 1, place: Some(3), title: "霧の向こうの三灯",
-        text: "三灯は『救助船を求む』だ。昨夜も天墜ち砦から同じ合図が来た。この控えはにじんでるが、石継ぎの拓本師なら、煤けた旧村の石から印を読める。",
-        face: Portrait::new(Lightkeeper, Worried),
+        text: "灯が三つなら、救助船を出せって合図だ。昨夜も天墜ち砦で光った。こっちの控えはもう読めんが、石継ぎの拓本師に聞いてみな。旧村から運んだ石に、あの晩の印が残ってる。",
+        delivery: Delivery::spoken("灯台守", Lightkeeper, Worried),
     },
     ChapterBeat {
         site: 5, place: Some(1), title: "石に残った船名",
-        text: "拓本を重ねてごらん。削られた欄に船の名が戻る。兵を運ぶ船が、名簿の外にいた人々を救った。出港印の主は、ノクス北門街の閲覧所で調べられるよ。",
-        face: Portrait::new(Mason, Speaking),
+        text: "拓本をここに重ねてみて。削られた欄に船の名が出たでしょう？　兵を運ぶ船が、名簿にない人たちも助けたのね。誰が船を出したかは、ノクス北門街の閲覧所で聞いてみて。",
+        delivery: Delivery::spoken("拓本師", Mason, Neutral),
     },
     ChapterBeat {
         site: 7, place: Some(3), title: "二つの旗、ひとつの門",
-        text: "この印は私のものだ。船に乗った人々の名が思い出せない。これで砦を開けてくれ。名は本人に返し、救助したという事実は、門前に掲げてほしい。",
-        face: Portrait::new(Baldo, Sad),
+        text: "ああ、船を出す許可を出したのは私だ。それなのに、乗せた人たちの名が思い出せん。これで砦を開けてくれ。名前は本人にだけ伝えて、助かった人がいたことは門前に掲げてほしい。",
+        delivery: Delivery::spoken("バルド", Baldo, Sad),
     },
     ChapterBeat {
         site: 12, place: None, title: "天墜ち砦の残響",
-        text: "あなたのお父さんが見える。船を通すために、最後まで砦に残ったんだ。声も、まだ聴こえる。封印は閉じたまま記録を写して、港へ届けよう。",
-        face: Portrait::new(Lilith, Surprised),
+        text: "アレン、あれ……あなたのお父さんだ。船を通すために、ここに残ったんだね。まだ声が聞こえる。封印には触らずに、記録だけ写して港へ持っていこう。",
+        delivery: Delivery::spoken("リリス", Lilith, Surprised),
     },
     ChapterBeat {
         site: 1, place: Some(1), title: "次の港への約束",
-        text: "写しは港で預かろう。原本の一部はセレスティアの聖堂へ運ばれた。確かめに行くなら、次の船に乗れる。ほら、乗船札を二枚用意してある。",
-        face: Portrait::new(Lightkeeper, Smile),
+        text: "写しはここで預かるよ。元の記録は、一部がセレスティアの聖堂に運ばれたそうだ。確かめに行くかい？　次の船なら間に合う。ほら、二人ぶんの乗船札だ。",
+        delivery: Delivery::spoken("灯台守", Lightkeeper, Smile),
     },
 ];
 

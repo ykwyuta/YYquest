@@ -1,7 +1,7 @@
-use super::{Frame, Sprite, GOLD, INK, IVORY, LINE};
+use super::{Frame, Sprite, GOLD, INK, IVORY, LINE, MINT, MIST};
 use crate::{
     art_sizes,
-    dialogue::{Portrait, Speaker},
+    dialogue::{Delivery, Portrait, Speaker},
 };
 
 fn face_art(portrait: Portrait) -> Sprite {
@@ -19,10 +19,10 @@ impl Frame {
         (x, y): (i32, i32),
         width: i32,
         lines: &[&str],
-        face: Option<Portrait>,
+        delivery: Delivery,
     ) {
         const FACE_SIZE: i32 = 64;
-        let (text_x, text_y, text_width) = if let Some(face) = face {
+        let (text_x, text_width) = if let Some(face) = delivery.portrait() {
             self.rect(x - 1, y - 1, FACE_SIZE + 2, FACE_SIZE + 2, INK);
             self.rect(x, y, FACE_SIZE, FACE_SIZE, LINE);
             self.rect(x + 1, y + 1, FACE_SIZE - 2, FACE_SIZE - 2, 0x191d2a);
@@ -34,25 +34,108 @@ impl Frame {
                 [0, 0, self.width as i32, super::HEIGHT as i32],
                 !matches!(face.speaker, Speaker::Lightkeeper | Speaker::Villager),
             );
-            self.label(x + FACE_SIZE + 12, y, 11, GOLD, face.speaker.name());
-            (x + FACE_SIZE + 12, y + 15, width - FACE_SIZE - 12)
+            (x + FACE_SIZE + 12, width - FACE_SIZE - 12)
         } else {
-            (x, y, width)
+            (x, width)
         };
+        let (header, accent) = match delivery {
+            Delivery::Speech { name, .. } => (name, GOLD),
+            Delivery::Scene => ("状況", MIST),
+            Delivery::Record(source) => (source, MINT),
+            Delivery::Guide => ("案内", MINT),
+        };
+        self.label(text_x, y, 11, accent, header);
         let columns = (text_width / 10).max(1) as usize;
         let mut row = 0;
-        for line in lines {
-            let chars: Vec<_> = line.chars().collect();
-            for chunk in chars.chunks(columns) {
+        for (index, line) in lines.iter().enumerate() {
+            let prefix = if delivery.is_speech() && index == 0 {
+                "「"
+            } else {
+                ""
+            };
+            let suffix = if delivery.is_speech() && index + 1 == lines.len() {
+                "」"
+            } else {
+                ""
+            };
+            let chars: Vec<_> = prefix
+                .chars()
+                .chain(line.chars())
+                .chain(suffix.chars())
+                .collect();
+            let mut start = 0;
+            while start < chars.len() {
+                let end = line_end(&chars, start, columns);
                 self.label(
                     text_x,
-                    text_y + 12 * row,
+                    y + 15 + 12 * row,
                     10,
                     IVORY,
-                    chunk.iter().collect::<String>(),
+                    chars[start..end].iter().collect::<String>(),
                 );
+                start = end;
                 row += 1;
             }
         }
+    }
+}
+
+fn line_end(chars: &[char], start: usize, columns: usize) -> usize {
+    const NO_START: &str = "、。，．！？）」』】〉》］｝・ー…ぁぃぅぇぉっゃゅょァィゥェォッャュョ";
+    const NO_END: &str = "（「『【〈《［｛";
+    let mut end = (start + columns).min(chars.len());
+    while end > start + 1
+        && end < chars.len()
+        && (NO_START.contains(chars[end]) || NO_END.contains(chars[end - 1]))
+    {
+        end -= 1;
+    }
+    end
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dialogue::Expression;
+
+    #[test]
+    fn presentation_marks_only_direct_speech_as_quoted() {
+        let mut frame = Frame::new();
+        for (delivery, heading, quoted) in [
+            (
+                Delivery::spoken("夜番", Speaker::Worker, Expression::Speaking),
+                "夜番",
+                true,
+            ),
+            (Delivery::Scene, "状況", false),
+            (Delivery::Record("積み荷控え"), "積み荷控え", false),
+            (Delivery::Guide, "案内", false),
+        ] {
+            frame.labels.clear();
+            frame.dialogue_content(
+                (12, 12),
+                280,
+                &["薪を運んだ。", "雪が降っていた。"],
+                delivery,
+            );
+            let lines: Vec<_> = frame
+                .labels
+                .iter()
+                .map(|label| label.text.as_str())
+                .collect();
+            assert_eq!(lines[0], heading);
+            assert_eq!(lines[1].starts_with('「'), quoted);
+            assert_eq!(lines[2].ends_with('」'), quoted);
+        }
+    }
+
+    #[test]
+    fn japanese_wrap_keeps_punctuation_and_brackets_with_text() {
+        let text: Vec<_> = "薪を運、ぶ「炉」".chars().collect();
+        assert_eq!(line_end(&text, 0, 3), 2);
+        assert_eq!(line_end(&text, 2, 4), 5);
+        assert_eq!(line_end(&text, 5, 3), text.len());
+        let quoted: Vec<_> = "薪を「炉」へ".chars().collect();
+        assert_eq!(line_end(&quoted, 0, 4), 2);
     }
 }

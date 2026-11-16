@@ -35,7 +35,7 @@ function hasTitle() {
   has("アルカディア");
 }
 function hasDialogue(line) {
-  has(line);
+  assert.ok(labels.join("").includes(line), labels.join(" / "));
   assert.ok(!labels.some((text) => text.includes("案内精霊") || text.includes("移動　　決定　会話・調査")),
     labels.join(" / "));
 }
@@ -72,7 +72,7 @@ has("精霊　共同炉へ");
 press(...Array(4).fill(left), ...Array(74).fill(up));
 has("共同炉");
 press(enter, enter);
-has("警備隊が避難者の名前");
+has("警備隊が避難してきた人");
 press(enter);
 has("精霊　冬越し小屋へ");
 press(escape);
@@ -125,10 +125,13 @@ hasDialogue("東の森で笛");
 has("炉番");
 assert.equal(wasm.reading_dialogue(), 1);
 press(enter, down, down, ...Array(10).fill(right), down, down, enter);
-hasDialogue("門を持ち上げたい");
+hasDialogue("さっき笛を吹いた");
 has("リリス");
 assert.ok(!labels.some((text) => text.includes("仲間になった")));
-press(enter, down, left, left, left, enter, enter);
+press(enter, down, left, left, left, enter);
+hasDialogue("魔物が飛び出した");
+has("状況");
+press(enter);
 has("霧のスライム");
 has("HP 12/12");
 press(down, enter);
@@ -145,6 +148,7 @@ has("忘却の獣");
 has("記憶を消費しない");
 press(down, down, enter, enter, enter, enter, enter, enter, enter, enter);
 hasDialogue("三つの灯");
+has("石碑に残った声");
 press(enter);
 hasDialogue("一緒に行く");
 press(enter);
@@ -173,6 +177,8 @@ has("デバッグモード");
 press(escape, escape, down, enter, enter, enter, down, enter);
 has("炉の名札");
 has("名札のない薪束");
+has("夜番");
+assert.ok(labels.some((text) => text.startsWith("「")));
 press(enter);
 has("寄合小屋へ");
 press(escape, escape, escape);

@@ -14,7 +14,7 @@ pub(crate) enum Speaker {
 }
 
 impl Speaker {
-    pub(crate) fn name(self) -> &'static str {
+    pub(crate) const fn name(self) -> &'static str {
         match self {
             Self::Allen => "アレン",
             Self::Lilith => "リリス",
@@ -61,15 +61,67 @@ impl Portrait {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Delivery {
+    Speech {
+        name: &'static str,
+        face: Option<Portrait>,
+    },
+    Scene,
+    Record(&'static str),
+    Guide,
+}
+
+impl Delivery {
+    pub(crate) const fn spoken(
+        name: &'static str,
+        speaker: Speaker,
+        expression: Expression,
+    ) -> Self {
+        Self::Speech {
+            name,
+            face: Some(Portrait::new(speaker, expression)),
+        }
+    }
+
+    pub(crate) fn is_speech(self) -> bool {
+        matches!(self, Self::Speech { .. })
+    }
+
+    pub(crate) fn portrait(self) -> Option<Portrait> {
+        match self {
+            Self::Speech { face, .. } => face,
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct Message {
     pub lines: [&'static str; 2],
-    pub face: Option<Portrait>,
+    pub delivery: Delivery,
 }
 
 impl Message {
     pub(crate) const fn narration(lines: [&'static str; 2]) -> Self {
-        Self { lines, face: None }
+        Self {
+            lines,
+            delivery: Delivery::Scene,
+        }
+    }
+
+    pub(crate) const fn guide(lines: [&'static str; 2]) -> Self {
+        Self {
+            lines,
+            delivery: Delivery::Guide,
+        }
+    }
+
+    pub(crate) const fn record(source: &'static str, lines: [&'static str; 2]) -> Self {
+        Self {
+            lines,
+            delivery: Delivery::Record(source),
+        }
     }
 
     pub(crate) const fn spoken(
@@ -79,7 +131,7 @@ impl Message {
     ) -> Self {
         Self {
             lines,
-            face: Some(Portrait::new(speaker, expression)),
+            delivery: Delivery::spoken(speaker.name(), speaker, expression),
         }
     }
 }

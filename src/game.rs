@@ -600,7 +600,7 @@ impl Game {
             if route.get(next) >= route.get(current) {
                 self.clear_held_direction();
                 self.after = After::None;
-                self.message = Some(Message::narration([
+                self.message = Some(Message::guide([
                     "守護精霊が導くほうに進んでみよう。",
                     "光の跡をたどれば、次の目的地に着く。",
                 ]));
@@ -642,8 +642,8 @@ impl Game {
                     Hearth,
                     Worried,
                     [
-                        "東の森で笛が鳴った。水門を見てきて。",
-                        "父さんの剣は、水門の留め具にも合うはずだ。",
+                        "アレン、東の森で笛が鳴ったよ。水門を見てきておくれ。",
+                        "あんたの父さんは、その剣で水門を開けてた。持っておいき。",
                     ],
                 )
             }
@@ -653,21 +653,17 @@ impl Game {
                     Lilith,
                     Speaking,
                     [
-                        "村の水が濁る前に、門を持ち上げたい。",
-                        "私は門を支える。あなたは霧を追い払って。",
+                        "来てくれたんだ。さっき笛を吹いたの、私。",
+                        "門の下に何かいる。私が門を支えるから、追い払ってくれる？",
                     ],
                 )
             }
             Intro::Sluice => {
                 self.after = After::Fight(Lesson::Sluice);
-                Message::spoken(
-                    Allen,
-                    Surprised,
-                    [
-                        "剣を留め具に差すと、門の奥から魔物が現れた。",
-                        "決定で戦う。剣で攻撃し、まもると被害が減る。",
-                    ],
-                )
+                Message::narration([
+                    "アレンが剣を留め具に差し込むと、水門が持ち上がった。",
+                    "リリスが門を支える。その足元から魔物が飛び出した。",
+                ])
             }
             Intro::Memorial => {
                 self.after = After::Fight(Lesson::Memorial);
@@ -675,8 +671,8 @@ impl Game {
                     Lilith,
                     Resolute,
                     [
-                        "あなたの剣と碑が、同じ音で鳴る。",
-                        "私が精霊共鳴で霧を裂く。剣で守って。",
+                        "聞こえる？　石碑から、さっきの剣と同じ音がする。",
+                        "私が精霊を呼んで霧を払う。少しの間、守ってくれる？",
                     ],
                 )
             }
@@ -687,8 +683,8 @@ impl Game {
                     Hearth,
                     Relieved,
                     [
-                        "水路はまた流れているよ。",
-                        "炉のそばで休み、アレンの体力が回復した。",
+                        "水はもう来てるよ。火のそばにおいで。",
+                        "顔色がよくなったね。出る前に、もう少し温まっていきな。",
                     ],
                 )
             }
@@ -698,8 +694,8 @@ impl Game {
                     Hearth,
                     Smile,
                     [
-                        "水が戻ったよ。旧宅に父さんの帰還簿がある。",
-                        "明るいうちに、二人で調べてみるといい。",
+                        "水が戻ったよ。二人とも、よくやってくれたね。",
+                        "父さんの帰還簿なら、前に住んでた家にあるよ。",
                     ],
                 )
             }
@@ -716,7 +712,10 @@ impl Game {
                 self.message = Some(Message::spoken(
                     Speaker::Allen,
                     Expression::Thoughtful,
-                    ["父が残った理由を知りたい。", "一緒に行く？"],
+                    [
+                        "どうして父さんがあの日、砦に残ったのか知りたい。",
+                        "家に手がかりがあるかもしれない。一緒に行く？",
+                    ],
                 ));
                 self.after = After::Reply;
             }
@@ -725,8 +724,8 @@ impl Game {
                     Speaker::Lilith,
                     Expression::Resolute,
                     [
-                        "碑は私の名を呼んだ。答えを探したい。",
                         "うん、私も一緒に行く。",
+                        "どうして石碑から私を呼ぶ声がしたのか、確かめたい。",
                     ],
                 ));
                 self.after = After::Recruit;
@@ -736,8 +735,8 @@ impl Game {
                 self.companion_position = Some(self.intro.waiting_lilith());
                 self.intro = Intro::Return;
                 self.message = Some(Message::narration([
-                    "二人は帰還簿を探すと約束した。",
-                    "リリスが仲間になった。炉番に報告しよう。",
+                    "二人はガウェインの記録を探すことにした。",
+                    "リリスが仲間になった。",
                 ]));
             }
             After::BeginNox => {
@@ -767,8 +766,8 @@ impl Game {
                 Speaker::Lilith,
                 Expression::Worried,
                 [
-                    "霧の外まで引っ張ったよ。もう大丈夫。",
-                    "体力と記憶が戻った。決定で再び調べられる。",
+                    "よかった、目を開けた。霧の外まで連れてきたんだ。",
+                    "立てそう？　もう一度行くなら、今度は私もそばにいる。",
                 ],
             ));
             return;
@@ -780,18 +779,21 @@ impl Game {
                     Speaker::Lilith,
                     Expression::Relieved,
                     [
-                        "水が流れ出したね。剣の音に、北の碑が応えてる。",
-                        "先に石碑へ行って待つね。",
+                        "水が流れ出したね。あれ、北のほうからも剣と同じ音がする。",
+                        "石碑のほうだ。先に見てくるね。",
                     ],
                 )
             }
             Lesson::Memorial => {
                 self.intro = Intro::Choice;
                 self.after = After::Ask;
-                Message::narration([
-                    "碑に、父が三つの灯で船を呼ぶ夜が浮かんだ。",
-                    "声「ガウェイン、船は着く。リリス、灯を守れ」",
-                ])
+                Message::record(
+                    "石碑に残った声",
+                    [
+                        "ガウェイン、三つの灯が見えた。船はそっちへ向かってる。",
+                        "リリス、船が着くまで灯を絶やすな。",
+                    ],
+                )
             }
         });
     }
@@ -1208,7 +1210,7 @@ mod tests {
         game.advance_traffic(STEP_MS);
         assert_eq!((game.x, game.y), MEETING);
         game.input(Key::Confirm);
-        assert!(game.message.unwrap().lines[0].contains("村の水"));
+        assert!(game.message.unwrap().lines[0].contains("さっき笛を吹いた"));
     }
 
     #[test]
@@ -1242,13 +1244,25 @@ mod tests {
         game.input(Confirm);
         assert!(!game.lilith);
         assert_eq!(
-            game.message.as_ref().unwrap().face.unwrap().speaker,
+            game.message
+                .as_ref()
+                .unwrap()
+                .delivery
+                .portrait()
+                .unwrap()
+                .speaker,
             Speaker::Allen
         );
         game.input(Confirm);
         assert!(!game.lilith);
         assert_eq!(
-            game.message.as_ref().unwrap().face.unwrap().speaker,
+            game.message
+                .as_ref()
+                .unwrap()
+                .delivery
+                .portrait()
+                .unwrap()
+                .speaker,
             Speaker::Lilith
         );
         press(&mut game, &[Confirm, Confirm]);
