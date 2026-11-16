@@ -1,4 +1,8 @@
-use crate::island::{Island, Kind};
+use crate::{
+    game::Key,
+    island::{Island, Kind, Tile},
+    town::{self, Town, Travel},
+};
 
 pub(crate) const MAP: [&[u8; 24]; 15] = [
     b"........................",
@@ -88,6 +92,8 @@ impl Region {
 pub(crate) struct WorldMap {
     pub(crate) selected: Region,
     pub(crate) island: Option<Island>,
+    pub(crate) town: Option<Town>,
+    pub(crate) town_progress: town::Progress,
 }
 
 impl WorldMap {
@@ -95,6 +101,8 @@ impl WorldMap {
         Self {
             selected: Region::Nox,
             island: None,
+            town: None,
+            town_progress: Default::default(),
         }
     }
 
@@ -112,6 +120,14 @@ impl WorldMap {
 
     pub(crate) fn confirm(&mut self) {
         if let Some(island) = &self.island {
+            if island.region == Region::Nox {
+                if let Tile::Settlement(index) = island.tile(island.x, island.y) {
+                    if index < town::COUNT {
+                        self.town = Some(Town::new(index, &self.town_progress[index]));
+                        return;
+                    }
+                }
+            }
             if island
                 .current_landmark()
                 .is_some_and(|site| site.kind == Kind::Harbor)
@@ -120,6 +136,18 @@ impl WorldMap {
             }
         } else {
             self.island = Some(Island::new(self.selected));
+        }
+    }
+
+    pub(crate) fn town_input(&mut self, key: Key) {
+        let Some(town) = &mut self.town else { return };
+        match town.input(key, &mut self.town_progress[town.index]) {
+            Travel::Stay => {}
+            Travel::Island => self.town = None,
+            Travel::Sea => {
+                self.town = None;
+                self.island = None;
+            }
         }
     }
 

@@ -1,4 +1,5 @@
-use super::{Frame, WIDTH};
+use super::{Frame, Sprite, BUFFER_WIDTH, DISPLAY_SCALE};
+use crate::art_sizes;
 use crate::noise::sample as natural_noise;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -44,14 +45,14 @@ impl Ground {
     }
 }
 
-const TEXTURES: &[u8; 16 * 64 * 64 * 3] =
+const TEXTURES: &[u8; 16 * art_sizes::TERRAIN * art_sizes::TERRAIN * 3] =
     include_bytes!(concat!(env!("OUT_DIR"), "/map-terrain.rgb"));
-const VARIED_TEXTURES: &[u8; 16 * 64 * 64 * 3] =
+const VARIED_TEXTURES: &[u8; 16 * art_sizes::TERRAIN * art_sizes::TERRAIN * 3] =
     include_bytes!(concat!(env!("OUT_DIR"), "/map-terrain-variants.rgb"));
 
 macro_rules! sprite_assets {
     ($($asset:ident => $name:literal),* $(,)?) => {
-        $(pub(super) const $asset: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/map-", $name, ".rgba"));)*
+        $(pub(super) const $asset: Sprite = Sprite::new(include_bytes!(concat!(env!("OUT_DIR"), "/map-", $name, ".rgba")), art_sizes::MAP_OBJECT);)*
     };
 }
 
@@ -82,25 +83,41 @@ sprite_assets! {
     CARRIAGE_NORTH => "carriage-north",
 }
 
-pub(super) fn fauna_sprite(species: crate::island::fauna::Species) -> &'static [u8] {
-    use crate::{island::fauna::SPECIES_PER_ISLAND, world_map::Region};
+pub(super) fn town_sprite(index: usize) -> Sprite {
+    const SIZE: usize = art_sizes::MAP_OBJECT;
+    const STRIDE: usize = SIZE * SIZE * 4;
+    const ATLAS: &[u8; 16 * STRIDE] = include_bytes!(concat!(env!("OUT_DIR"), "/nox-town.rgba"));
+    Sprite::new(&ATLAS[index * STRIDE..(index + 1) * STRIDE], SIZE)
+}
 
-    const STRIDE: usize = super::ART_SIZE * super::ART_SIZE * 4;
-    let atlas: &[u8; SPECIES_PER_ISLAND * STRIDE] = match species.region {
+pub(super) fn fauna_sprite(species: crate::island::fauna::Species) -> Sprite {
+    use crate::{island::fauna::ANIMAL_SPECIES, world_map::Region};
+
+    const ANIMAL: usize = art_sizes::ANIMAL * art_sizes::ANIMAL * 4;
+    const BEAST: usize = art_sizes::BEAST * art_sizes::BEAST * 4;
+    let atlas: &[u8] = match species.region {
         Region::Nox => include_bytes!(concat!(env!("OUT_DIR"), "/fauna-nox.rgba")),
         Region::Celestia => include_bytes!(concat!(env!("OUT_DIR"), "/fauna-celestia.rgba")),
         Region::Sylva => include_bytes!(concat!(env!("OUT_DIR"), "/fauna-sylva.rgba")),
         Region::Liberta => include_bytes!(concat!(env!("OUT_DIR"), "/fauna-liberta.rgba")),
         Region::Vulcan => include_bytes!(concat!(env!("OUT_DIR"), "/fauna-vulcan.rgba")),
     };
-    let index = species.index;
-    &atlas[index * STRIDE..(index + 1) * STRIDE]
+    let (start, stride, side) = if species.is_beast() {
+        (
+            ANIMAL_SPECIES * ANIMAL + (species.index - ANIMAL_SPECIES) * BEAST,
+            BEAST,
+            art_sizes::BEAST,
+        )
+    } else {
+        (species.index * ANIMAL, ANIMAL, art_sizes::ANIMAL)
+    };
+    Sprite::new(&atlas[start..start + stride], side)
 }
 
-pub(super) fn settlement(region: crate::world_map::Region, index: usize) -> &'static [u8] {
+pub(super) fn settlement(region: crate::world_map::Region, index: usize) -> Sprite {
     use crate::{island::SETTLEMENTS, world_map::Region};
 
-    const STRIDE: usize = super::ART_SIZE * super::ART_SIZE * 4;
+    const STRIDE: usize = art_sizes::SETTLEMENT * art_sizes::SETTLEMENT * 4;
     let atlas: &[u8; SETTLEMENTS * STRIDE] = match region {
         Region::Nox => include_bytes!(concat!(env!("OUT_DIR"), "/settlements-nox.rgba")),
         Region::Celestia => include_bytes!(concat!(env!("OUT_DIR"), "/settlements-celestia.rgba")),
@@ -108,7 +125,10 @@ pub(super) fn settlement(region: crate::world_map::Region, index: usize) -> &'st
         Region::Liberta => include_bytes!(concat!(env!("OUT_DIR"), "/settlements-liberta.rgba")),
         Region::Vulcan => include_bytes!(concat!(env!("OUT_DIR"), "/settlements-vulcan.rgba")),
     };
-    &atlas[index * STRIDE..(index + 1) * STRIDE]
+    Sprite::new(
+        &atlas[index * STRIDE..(index + 1) * STRIDE],
+        art_sizes::SETTLEMENT,
+    )
 }
 
 #[cfg(test)]
@@ -124,14 +144,15 @@ mod tests {
         let mut sprites = HashSet::new();
         for region in Region::ALL {
             for index in 0..SPECIES_PER_ISLAND {
-                let sprite = super::fauna_sprite(Species::new(region, index));
+                let sprite = super::fauna_sprite(Species::new(region, index)).pixels;
                 assert!(sprites.insert(sprite), "{region:?} {index}");
                 let visible = sprite
                     .chunks_exact(4)
                     .filter(|pixel| pixel[3] >= 128)
                     .count();
+                let area = sprite.len() / 4;
                 assert!(
-                    (400..3600).contains(&visible),
+                    visible > area / 10 && visible < area * 9 / 10,
                     "{region:?} {index}: {visible}"
                 );
             }
@@ -144,7 +165,7 @@ mod tests {
         let mut sprites = HashSet::new();
         for region in Region::ALL {
             for index in 0..SETTLEMENTS {
-                let sprite = settlement(region, index);
+                let sprite = settlement(region, index).pixels;
                 assert!(sprites.insert(sprite), "{region:?} sprite {index}");
                 let visible = sprite
                     .chunks_exact(4)
@@ -165,14 +186,18 @@ impl Frame {
         materials: [Ground; 9],
         size: i32,
     ) {
-        let (sx, sy) = screen;
+        let (sx, sy) = (
+            screen.0 * DISPLAY_SCALE as i32,
+            screen.1 * DISPLAY_SCALE as i32,
+        );
+        let size = size * DISPLAY_SCALE as i32;
         let (map_x, map_y) = (tile.0 * size, tile.1 * size);
         let center = materials[4];
         let uniform = materials.iter().all(|&ground| ground == center);
         for py in 0..size {
             for px in 0..size {
                 let (x, y) = (map_x + px, map_y + py);
-                let index = (sy + py) as usize * WIDTH + (sx + px) as usize;
+                let index = (sy + py) as usize * BUFFER_WIDTH + (sx + px) as usize;
                 self.pixels[index] = if uniform || center == Ground::Dock {
                     texture(center, x, y)
                 } else {
@@ -194,7 +219,7 @@ impl Frame {
 }
 
 fn texture(ground: Ground, x: i32, y: i32) -> u32 {
-    const FINE: &[u8; 16 * 64 * 64 * 3] =
+    const FINE: &[u8; 16 * art_sizes::TERRAIN * art_sizes::TERRAIN * 3] =
         include_bytes!(concat!(env!("OUT_DIR"), "/map-fine-ground.rgb"));
     let micro = match ground {
         Ground::Stone => Some(0),
@@ -226,9 +251,10 @@ fn texture(ground: Ground, x: i32, y: i32) -> u32 {
     } else {
         1
     };
-    let row = (y * frequency).rem_euclid(64) as usize;
-    let col = (x * frequency).rem_euclid(64) as usize;
-    let offset = (cell * 64 * 64 + row * 64 + col) * 3;
+    let side = art_sizes::TERRAIN;
+    let row = (y * frequency).rem_euclid(side as i32) as usize;
+    let col = (x * frequency).rem_euclid(side as i32) as usize;
+    let offset = (cell * side * side + row * side + col) * 3;
     let [r, g, b] = [texels[offset], texels[offset + 1], texels[offset + 2]];
     u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
 }
@@ -262,7 +288,7 @@ fn transition(center: Ground, colors: [(Ground, i32); 4], x: i32, y: i32) -> u32
         return shore(water, dry, wet, x, y);
     }
     let mut result = texture(center, x, y);
-    let grain = (natural_noise(x, y, 7) - 128) / 8;
+    let grain = (natural_noise(x, y, 7 * DISPLAY_SCALE as i32) - 128) / 8;
     for (other, weight) in colors.into_iter().skip(1) {
         if weight == 0 || other == center {
             continue;
@@ -274,7 +300,7 @@ fn transition(center: Ground, colors: [(Ground, i32); 4], x: i32, y: i32) -> u32
 }
 
 fn shore(water: i32, land: Ground, sea: Ground, x: i32, y: i32) -> u32 {
-    let ripple = natural_noise(x, y, 11) - 128;
+    let ripple = natural_noise(x, y, 11 * DISPLAY_SCALE as i32) - 128;
     let water = water + ripple;
     let bank = match land {
         Ground::Obsidian | Ground::Cinder | Ground::Lava => Ground::SlateShore,
@@ -308,7 +334,7 @@ fn shore(water: i32, land: Ground, sea: Ground, x: i32, y: i32) -> u32 {
     if water < 620 {
         let base = mix(wet, shallows, (water - 508) * 3);
         let crest = (water - 561).abs();
-        if crest < 29 && natural_noise(x, y, 5) > 64 {
+        if crest < 29 && natural_noise(x, y, 5 * DISPLAY_SCALE as i32) > 64 {
             mix(base, 0xa3c5ad, (29 - crest) * 5)
         } else {
             base
@@ -326,7 +352,7 @@ pub(super) fn patch(x: i32, y: i32) -> i32 {
     natural_noise(x, y, 9)
 }
 
-pub(super) fn tree(region: crate::world_map::Region, variation: usize) -> &'static [u8] {
+pub(super) fn tree(region: crate::world_map::Region, variation: usize) -> Sprite {
     use crate::world_map::Region;
     let palette = match region {
         Region::Celestia => [BIRCH, GOLD_OAK, GREEN_FIR, GNARLED_OAK, FOREST],

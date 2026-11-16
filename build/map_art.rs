@@ -1,10 +1,10 @@
 use image::{imageops, RgbaImage};
 use std::{fs, path::Path};
 
-use super::{export, fit_sprite, load};
+use super::{art_sizes, export, fit_sprite, load};
 
 const ART_DIR: &str = "assets/maps";
-const TERRAIN_SIZE: u32 = 64;
+const TERRAIN_SIZE: u32 = art_sizes::TERRAIN as u32;
 
 pub(super) fn build(out: &Path) {
     build_textures(
@@ -28,14 +28,24 @@ pub(super) fn build(out: &Path) {
     let sprites = load(&format!("{ART_DIR}/local-landmarks.png"));
     for (index, name) in [(1, "nox-cottage"), (4, "elder-tree"), (6, "memorial")] {
         let sprite = cell(&sprites, 4, 3, index % 4, index / 4);
-        export(&sprite, &format!("map-{name}"), out);
+        export(&sprite, &format!("map-{name}"), art_sizes::MAP_OBJECT, out);
     }
 
     build_settlements(out);
+    let nox_town = load(&format!("{ART_DIR}/nox-town.png"));
+    let mut sprites = Vec::new();
+    for index in 0..16 {
+        let tile = cell(&nox_town, 4, 4, index % 4, index / 4);
+        let name = format!("Nox town sprite {index}");
+        let tile = isolate_settlement(tile, &name);
+        sprites.extend(fit_sprite(&tile, &name, art_sizes::MAP_OBJECT).into_raw());
+    }
+    fs::write(out.join("nox-town.rgba"), sprites).unwrap();
     for name in ["forest", "mountain", "farm"] {
         export(
             &load(&format!("{ART_DIR}/{name}.png")),
             &format!("map-{name}"),
+            art_sizes::MAP_OBJECT,
             out,
         );
     }
@@ -61,7 +71,7 @@ fn build_textures(textures: &RgbaImage, out: &Path, filename: &str) {
                 &square,
                 TERRAIN_SIZE,
                 TERRAIN_SIZE,
-                imageops::FilterType::Triangle,
+                imageops::FilterType::Lanczos3,
             );
             soften_edges(&mut tile);
             terrain.extend(
@@ -76,7 +86,7 @@ fn build_textures(textures: &RgbaImage, out: &Path, filename: &str) {
 fn soften_edges(tile: &mut RgbaImage) {
     // Cross-fade the opposing edges. Equal endpoints can then repeat without
     // reflecting wheel ruts or creating symmetrical pairs of waves.
-    const BLEND: u32 = 9;
+    const BLEND: u32 = 18;
     for vertical in [false, true] {
         for across in 0..TERRAIN_SIZE {
             for edge in 0..BLEND {
@@ -128,6 +138,7 @@ fn build_roadside(out: &Path) {
         export(
             &isolate_settlement(sprite, name),
             &format!("map-{name}"),
+            art_sizes::MAP_OBJECT,
             out,
         );
     }
@@ -137,6 +148,7 @@ fn build_roadside(out: &Path) {
         export(
             &isolate_settlement(sprite, name),
             &format!("map-{name}"),
+            art_sizes::MAP_OBJECT,
             out,
         );
     }
@@ -160,7 +172,12 @@ fn build_fauna(out: &Path) {
             let sprite = cell(atlas, 4, rows, cell_index % 4, cell_index / 4);
             let name = format!("{region} fauna {}", index + 1);
             let clean = isolate_settlement(sprite, &name);
-            sprites.extend(fit_sprite(&clean, &name).into_raw());
+            let side = if index < 10 {
+                art_sizes::ANIMAL
+            } else {
+                art_sizes::BEAST
+            };
+            sprites.extend(fit_sprite(&clean, &name, side).into_raw());
         }
         fs::write(out.join(format!("fauna-{region}.rgba")), sprites).unwrap();
     }
@@ -179,7 +196,7 @@ fn build_settlements(out: &Path) {
             let sprite = cell(&atlas, 4, 4, index % 4, index / 4);
             let name = format!("{region} settlement {}", index + 1);
             let clean = isolate_settlement(sprite, &name);
-            sprites.extend(fit_sprite(&clean, &name).into_raw());
+            sprites.extend(fit_sprite(&clean, &name, art_sizes::SETTLEMENT).into_raw());
         }
         fs::write(out.join(format!("settlements-{region}.rgba")), sprites).unwrap();
     }
@@ -228,6 +245,25 @@ fn isolate_settlement(mut image: RgbaImage, name: &str) -> RgbaImage {
     let mut keep = vec![false; area];
     for index in largest {
         keep[index] = true;
+    }
+    // Keep the original alpha values around the main silhouette, including
+    // antialiased edges, while rejecting fragments from adjacent atlas cells.
+    for _ in 0..3 {
+        let previous = keep.clone();
+        for (index, pixel) in image.pixels().enumerate() {
+            if keep[index] || pixel[3] == 0 {
+                continue;
+            }
+            let (x, y) = (index as i32 % width as i32, index as i32 / width as i32);
+            keep[index] = (-1..=1).any(|dy| {
+                (-1..=1).any(|dx| {
+                    let (nx, ny) = (x + dx, y + dy);
+                    (0..width as i32).contains(&nx)
+                        && (0..height as i32).contains(&ny)
+                        && previous[ny as usize * width as usize + nx as usize]
+                })
+            });
+        }
     }
     for (pixel, keep) in image.pixels_mut().zip(keep) {
         if !keep {

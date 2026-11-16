@@ -7,6 +7,10 @@ const CELL: i32 = 12;
 
 impl Frame {
     pub(super) fn draw_world_map(&mut self, world: &WorldMap) {
+        if let Some(town) = &world.town {
+            self.draw_town(town, &world.town_progress[town.index]);
+            return;
+        }
         if let Some(island) = &world.island {
             self.draw_island(island);
             return;

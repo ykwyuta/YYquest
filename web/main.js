@@ -1,10 +1,7 @@
-const width = 320;
-const height = 240;
-const scale = 2;
+const coordinateScale = 2;
 const canvas = document.querySelector("#game");
 const view = canvas.getContext("2d", { alpha: false });
-const buffer = Object.assign(document.createElement("canvas"), { width, height }).getContext("2d", { alpha: false });
-const image = buffer.createImageData(width, height);
+let image;
 const decoder = new TextDecoder();
 const status = document.querySelector("#status");
 const controls = document.querySelector("#controls");
@@ -13,13 +10,16 @@ const mapButton = document.querySelector("#map-control");
 const refreshParam = "_yyrefresh";
 const keys = new Map([
   ["ArrowUp", 38], ["ArrowDown", 40], ["ArrowLeft", 37], ["ArrowRight", 39],
-  ["KeyW", 38], ["KeyS", 40], ["KeyA", 37], ["KeyD", 39],
+  ["KeyW", 87], ["KeyS", 83], ["KeyA", 65], ["KeyD", 68],
   ["Enter", 13], ["Space", 13], ["KeyZ", 13], ["KeyJ", 74], ["KeyM", 77], ["Escape", 27], ["KeyX", 27],
 ]);
 let wasm;
 let previousTrafficFrame = 0;
+let gamepadButtons = 0;
+let readGamepad = typeof navigator.getGamepads === "function";
 
 function animateTraffic(now) {
+  pollGamepad();
   const elapsed = Math.floor(now - previousTrafficFrame);
   if (elapsed >= 65) {
     previousTrafficFrame = now;
@@ -28,8 +28,33 @@ function animateTraffic(now) {
   requestAnimationFrame(animateTraffic);
 }
 
+function pollGamepad() {
+  if (!readGamepad) return;
+  let pad;
+  try {
+    pad = Array.from(navigator.getGamepads()).find((device) => device?.mapping === "standard");
+  } catch {
+    readGamepad = false;
+    return;
+  }
+  // Standard Gamepad mapping uses buttons 12–15 for the directional pad.
+  const buttons = [[12, 38], [13, 40], [14, 37], [15, 39], [1, 27], [0, 13]];
+  let held = 0;
+  for (const [index, code] of buttons) {
+    if (!pad?.buttons[index]?.pressed) continue;
+    held |= 1 << index;
+    if (!(gamepadButtons & (1 << index))) sendKey(code);
+  }
+  gamepadButtons = held;
+}
+
 const screen = {
-  bitmap(address) {
+  bitmap(address, width, height) {
+    if (!image || image.width !== width || image.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      image = view.createImageData(width, height);
+    }
     const pixels = new Uint32Array(wasm.memory.buffer, address, width * height);
     for (let i = 0; i < pixels.length; i++) {
       const rgb = pixels[i];
@@ -38,16 +63,14 @@ const screen = {
       image.data[i * 4 + 2] = rgb & 255;
       image.data[i * 4 + 3] = 255;
     }
-    buffer.putImageData(image, 0, 0);
-    view.imageSmoothingEnabled = false;
-    view.drawImage(buffer.canvas, 0, 0, width * scale, height * scale);
+    view.putImageData(image, 0, 0);
   },
   text(x, y, size, color, address, length) {
     const bytes = new Uint8Array(wasm.memory.buffer, address, length);
-    view.font = `600 ${size * scale}px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif`;
+    view.font = `600 ${size * coordinateScale}px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif`;
     view.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
     view.textBaseline = "top";
-    view.fillText(decoder.decode(bytes), x * scale, y * scale);
+    view.fillText(decoder.decode(bytes), x * coordinateScale, y * coordinateScale);
   },
 };
 
@@ -106,10 +129,11 @@ refreshButton.addEventListener("click", async () => {
   }
 });
 
-function sendKey(key) {
+function sendKey(key, repeat = false) {
   if (!wasm || refreshButton.disabled) return;
-  wasm.key(key);
+  wasm.key(key, repeat);
   refreshButton.hidden = !wasm.is_title();
+  mapButton.textContent = wasm.debug_back_control() ? "戻る" : "地図";
   mapButton.hidden = !wasm.has_map_control();
   if (refreshButton.hidden) status.hidden = true;
 }
@@ -137,7 +161,7 @@ window.addEventListener("keydown", (event) => {
   const key = keys.get(event.code);
   if (key === undefined) return;
   event.preventDefault();
-  if (!event.repeat || (key >= 37 && key <= 40)) sendKey(key);
+  sendKey(key, event.repeat);
 });
 
 controls.addEventListener("click", (event) => {

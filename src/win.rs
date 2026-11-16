@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     ffi::c_void,
     mem::{size_of, zeroed},
     ptr::{null, null_mut},
@@ -9,19 +9,21 @@ use windows_sys::Win32::{
     Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
     Graphics::Gdi::*,
     System::LibraryLoader::GetModuleHandleW,
-    UI::WindowsAndMessaging::*,
+    UI::{Input::XboxController::*, WindowsAndMessaging::*},
 };
 
 use yyquest::{
     game::{Game, Key},
-    render::{Frame, HEIGHT, WIDTH},
+    render::{Frame, BUFFER_HEIGHT, BUFFER_WIDTH, HEIGHT, WIDTH},
 };
 
 const CLASS: windows_sys::core::PCWSTR = windows_sys::w!("YYquest");
 const TRAFFIC_TIMER: usize = 1;
+const GAMEPAD_TIMER: usize = 2;
 const TRAFFIC_INTERVAL: u32 = 70;
 
 thread_local! {
+    static GAMEPAD_BUTTONS: Cell<u16> = const { Cell::new(0) };
     static SESSION: RefCell<(Game, Frame)> = RefCell::new((Game::new(), Frame::new()));
 }
 
@@ -59,6 +61,7 @@ pub fn run() {
         }
 
         SetTimer(window, TRAFFIC_TIMER, TRAFFIC_INTERVAL, None);
+        SetTimer(window, GAMEPAD_TIMER, 16, None);
         ShowWindow(window, SW_SHOW);
         let mut message: MSG = zeroed();
         while GetMessageW(&mut message, null_mut(), 0, 0) > 0 {
@@ -76,14 +79,24 @@ unsafe extern "system" fn window_proc(
 ) -> LRESULT {
     match message {
         WM_KEYDOWN => {
-            if let Some(key) = Key::from_code(wparam as u32) {
+            let code = wparam as u32;
+            if Key::from_code(code).is_some() {
                 let repeat = lparam & (1 << 30) != 0;
-                if !repeat || matches!(key, Key::Up | Key::Down | Key::Left | Key::Right) {
-                    SESSION.with(|session| session.borrow_mut().0.input(key));
+                if SESSION.with(|session| session.borrow_mut().0.input_code(code, repeat)) {
                     InvalidateRect(window, null(), 0);
                 }
                 return 0;
             }
+        }
+        WM_TIMER if wparam == GAMEPAD_TIMER => {
+            if GetForegroundWindow() == window {
+                if poll_gamepad() {
+                    InvalidateRect(window, null(), 0);
+                }
+            } else {
+                GAMEPAD_BUTTONS.set(0);
+            }
+            return 0;
         }
         WM_TIMER if wparam == TRAFFIC_TIMER => {
             if IsIconic(window) == 0
@@ -110,12 +123,40 @@ unsafe extern "system" fn window_proc(
         WM_ERASEBKGND => return 1,
         WM_DESTROY => {
             KillTimer(window, TRAFFIC_TIMER);
+            KillTimer(window, GAMEPAD_TIMER);
             PostQuitMessage(0);
             return 0;
         }
         _ => {}
     }
     DefWindowProcW(window, message, wparam, lparam)
+}
+
+unsafe fn poll_gamepad() -> bool {
+    let mut state: XINPUT_STATE = zeroed();
+    let buttons = (0..4)
+        .find(|&index| XInputGetState(index, &mut state) == 0)
+        .map_or(0, |_| state.Gamepad.wButtons);
+    let pressed = buttons & !GAMEPAD_BUTTONS.replace(buttons);
+    if pressed == 0 {
+        return false;
+    }
+    SESSION.with(|session| {
+        let mut session = session.borrow_mut();
+        for (button, code) in [
+            (XINPUT_GAMEPAD_DPAD_UP, 38),
+            (XINPUT_GAMEPAD_DPAD_DOWN, 40),
+            (XINPUT_GAMEPAD_DPAD_LEFT, 37),
+            (XINPUT_GAMEPAD_DPAD_RIGHT, 39),
+            (XINPUT_GAMEPAD_B, 27),
+            (XINPUT_GAMEPAD_A, 13),
+        ] {
+            if pressed & button != 0 {
+                session.0.input_code(code, false);
+            }
+        }
+    });
+    true
 }
 
 unsafe fn paint_frame(dc: HDC, client: RECT, frame: &Frame) {
@@ -132,8 +173,8 @@ unsafe fn paint_frame(dc: HDC, client: RECT, frame: &Frame) {
     let bitmap = BITMAPINFO {
         bmiHeader: BITMAPINFOHEADER {
             biSize: size_of::<BITMAPINFOHEADER>() as u32,
-            biWidth: WIDTH as i32,
-            biHeight: -(HEIGHT as i32),
+            biWidth: BUFFER_WIDTH as i32,
+            biHeight: -(BUFFER_HEIGHT as i32),
             biPlanes: 1,
             biBitCount: 32,
             biCompression: BI_RGB,
@@ -154,7 +195,8 @@ unsafe fn paint_frame(dc: HDC, client: RECT, frame: &Frame) {
     }
     let previous = SelectObject(buffer, surface);
     FillRect(buffer, &client, GetStockObject(BLACK_BRUSH));
-    SetStretchBltMode(buffer, COLORONCOLOR as i32);
+    SetStretchBltMode(buffer, HALFTONE as i32);
+    SetBrushOrgEx(buffer, left, top, null_mut());
     StretchDIBits(
         buffer,
         left,
@@ -163,8 +205,8 @@ unsafe fn paint_frame(dc: HDC, client: RECT, frame: &Frame) {
         height,
         0,
         0,
-        WIDTH as i32,
-        HEIGHT as i32,
+        BUFFER_WIDTH as i32,
+        BUFFER_HEIGHT as i32,
         frame.pixels.as_ptr().cast::<c_void>(),
         &bitmap,
         DIB_RGB_COLORS,
