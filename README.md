@@ -62,6 +62,8 @@ python -m http.server 8765 --bind 127.0.0.1 --directory dist
 
 ## 実装と素材
 
+会話・地の文・記録・操作案内の書き分けと、公開前の確認手順は [日本語台本のレビューガイド](docs/dialogue-review.md) を参照してください。
+
 ノクスでは素材を採集し、調薬・売買・ドワーフ鍛冶ができます。島フィールドでは J（スマホは「手記」）で荷袋を開き、回復薬を使ったり武具を装備したりできます。[アイテム・貨幣経済の設計と入手先](docs/items-and-economy.md)
 
 ゲーム進行と 640×480 の画面描画は Windows と WebAssembly で共有します。座標には 320×240 の論理解像度を使います。Windows は Win32/GDI、ブラウザは Canvas 2D に描画します。キャラクターと敵の素材の出典は [assets/README.md](assets/README.md) を参照してください。

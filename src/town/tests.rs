@@ -56,7 +56,8 @@ fn read_beat(game: &mut Game, index: usize, story: usize, beat: &Beat, prefer_se
     }
     game.input(Key::Confirm);
     let panel = game.world_map.town.as_ref().unwrap().panel;
-    assert!(matches!(panel, Panel::Talk { text, .. } if text == beat.text));
+    assert!(matches!(panel, Panel::Talk { text, delivery, .. }
+        if text == beat.text && delivery == beat.delivery));
     if prefer_second
         && matches!(
             panel,
@@ -69,13 +70,13 @@ fn read_beat(game: &mut Game, index: usize, story: usize, beat: &Beat, prefer_se
         game.input(Key::Down);
     }
     game.input(Key::Confirm);
-    if matches!(
-        game.world_map.town.as_ref().unwrap().panel,
-        Panel::Talk {
-            next: Followup::Close,
-            ..
-        }
-    ) {
+    if let Panel::Talk {
+        delivery,
+        next: Followup::Close,
+        ..
+    } = game.world_map.town.as_ref().unwrap().panel
+    {
+        assert_eq!(delivery, Delivery::Scene);
         game.input(Key::Confirm);
     }
 }

@@ -261,19 +261,23 @@ impl Frame {
             Panel::Talk {
                 title,
                 text,
-                face,
+                delivery,
                 next,
             } => {
                 let width = (self.width as i32 - 20).min(344);
                 let x = (self.width as i32 - width) / 2;
                 self.panel(x, 35, width, 153);
                 self.label(x + 11, 43, 12, GOLD, title);
-                self.dialogue_content((x + 11, 62), width - 22, &[text], face);
+                self.dialogue_content((x + 11, 62), width - 22, &[text], delivery);
                 if let Followup::Choose(index, pick) = next {
                     let choices = plan.stories[index].choices.as_ref().unwrap();
                     for (i, choice) in choices.iter().enumerate() {
                         self.label(
-                            x + if face.is_some() { 89 } else { 11 },
+                            x + if delivery.portrait().is_some() {
+                                89
+                            } else {
+                                11
+                            },
                             151 + 15 * i as i32,
                             11,
                             if i == pick { MINT } else { IVORY },

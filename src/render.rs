@@ -328,19 +328,18 @@ impl Frame {
             );
         }
         if let Some(message) = game.message {
-            if message.face.is_some() {
-                self.panel(view.left - 1, 143, view.width() + 2, 94);
-                self.dialogue_content(
-                    (view.left + 9, 153),
-                    view.width() - 18,
-                    &message.lines,
-                    message.face,
-                );
+            let top = if message.delivery.is_speech() {
+                143
             } else {
-                self.panel(view.left - 1, 191, view.width() + 2, 46);
-                self.label(view.left + 8, 196, 11, IVORY, message.lines[0]);
-                self.label(view.left + 8, 211, 11, IVORY, message.lines[1]);
-            }
+                159
+            };
+            self.panel(view.left - 1, top, view.width() + 2, 237 - top);
+            self.dialogue_content(
+                (view.left + 9, top + 8),
+                view.width() - 18,
+                &message.lines,
+                message.delivery,
+            );
             self.label(view.clip[0] + 12, 225, 9, GOLD, "▼ 決定");
         } else {
             self.panel(view.left - 1, 191, view.width() + 2, 46);

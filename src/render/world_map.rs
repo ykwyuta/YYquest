@@ -19,7 +19,7 @@ impl Frame {
                     let x = (self.width as i32 - width) / 2;
                     self.panel(x, 38, width, 145);
                     self.label(x + 11, 47, 12, GOLD, beat.title);
-                    self.dialogue_content((x + 11, 65), width - 22, &[beat.text], Some(beat.face));
+                    self.dialogue_content((x + 11, 65), width - 22, &[beat.text], beat.delivery);
                 }
                 self.rect(122, 222, 96, 13, super::PANEL);
                 self.label(

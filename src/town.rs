@@ -5,7 +5,7 @@ mod tests;
 
 use crate::{
     campaign::ChapterBeat,
-    dialogue::{Expression, Portrait, Speaker},
+    dialogue::{Delivery, Expression, Speaker},
     economy::Service,
     walk::Walk,
 };
@@ -53,6 +53,46 @@ pub(crate) struct Place {
 pub(crate) struct Beat {
     place: usize,
     text: &'static str,
+    delivery: Delivery,
+}
+
+impl Beat {
+    const fn speech(
+        place: usize,
+        name: &'static str,
+        speaker: Speaker,
+        text: &'static str,
+    ) -> Self {
+        Self {
+            place,
+            text,
+            delivery: Delivery::spoken(name, speaker, Expression::Speaking),
+        }
+    }
+
+    const fn voice(place: usize, name: &'static str, text: &'static str) -> Self {
+        Self {
+            place,
+            text,
+            delivery: Delivery::Speech { name, face: None },
+        }
+    }
+
+    const fn scene(place: usize, text: &'static str) -> Self {
+        Self {
+            place,
+            text,
+            delivery: Delivery::Scene,
+        }
+    }
+
+    const fn record(place: usize, source: &'static str, text: &'static str) -> Self {
+        Self {
+            place,
+            text,
+            delivery: Delivery::Record(source),
+        }
+    }
 }
 
 pub(crate) struct Ending {
@@ -125,7 +165,7 @@ pub(crate) enum Panel {
     Talk {
         title: &'static str,
         text: &'static str,
-        face: Option<Portrait>,
+        delivery: Delivery,
         next: Followup,
     },
 }
@@ -347,7 +387,7 @@ impl Town {
                         self.panel = Panel::Talk {
                             title: beat.title,
                             text: beat.text,
-                            face: Some(beat.face),
+                            delivery: beat.delivery,
                             next: Followup::Main,
                         };
                     } else if let Action::Story(index) = action {
@@ -379,7 +419,7 @@ impl Town {
                         self.panel = Panel::Talk {
                             title,
                             text,
-                            face: None,
+                            delivery: Delivery::Scene,
                             next: Followup::Close,
                         };
                     }
@@ -390,14 +430,14 @@ impl Town {
             Panel::Talk {
                 title,
                 text,
-                face,
+                delivery,
                 next,
             } => match (next, key) {
                 (Followup::Choose(index, pick), Key::Up | Key::Down | Key::Left | Key::Right) => {
                     self.panel = Panel::Talk {
                         title,
                         text,
-                        face,
+                        delivery,
                         next: Followup::Choose(index, 1 - pick),
                     };
                 }
@@ -407,16 +447,7 @@ impl Town {
                     self.panel = Panel::Talk {
                         title,
                         text,
-                        face: face.map(|old| {
-                            Portrait::new(
-                                old.speaker,
-                                if pick == 0 {
-                                    Expression::Relieved
-                                } else {
-                                    Expression::Thoughtful
-                                },
-                            )
-                        }),
+                        delivery: Delivery::Scene,
                         next: Followup::Close,
                     };
                 }
@@ -466,33 +497,9 @@ impl Town {
         self.panel = Panel::Talk {
             title: story.title,
             text: story.beats[beat].text,
-            face: Some(self.story_face(story.beats[beat].place, index, beat, story.beats.len())),
+            delivery: story.beats[beat].delivery,
             next,
         };
-    }
-
-    fn story_face(&self, place: usize, story: usize, beat: usize, beats: usize) -> Portrait {
-        const FACES: [Speaker; 4] = [
-            Speaker::Villager,
-            Speaker::Worker,
-            Speaker::Guard,
-            Speaker::Traveler,
-        ];
-        let speaker = FACES[(self.index + place) % FACES.len()];
-        let expression = if beat + 1 == beats {
-            Expression::Relieved
-        } else if beat != 0 {
-            Expression::Thoughtful
-        } else {
-            [
-                Expression::Speaking,
-                Expression::Neutral,
-                Expression::Worried,
-                Expression::Surprised,
-                Expression::Speaking,
-            ][story]
-        };
-        Portrait::new(speaker, expression)
     }
 
     fn complete(&mut self, states: &mut [State; 5], index: usize, result: usize) {
