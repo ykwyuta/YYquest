@@ -316,10 +316,12 @@ function clearHeldDirections() {
 
 function updateControls() {
   stage.dataset.reading = Boolean(wasm.reading_dialogue?.());
+  const refreshWasHidden = refreshButton.hidden;
   refreshButton.hidden = !wasm.is_title();
   mapButton.textContent = wasm.debug_back_control() ? "戻る" : "地図";
   mapButton.hidden = !wasm.has_map_control();
   if (refreshButton.hidden && !saveFailed) status.hidden = true;
+  if (refreshButton.hidden !== refreshWasHidden) resizeViewport();
 }
 
 try {
@@ -334,14 +336,15 @@ try {
   controls.hidden = false;
   soundButton.hidden = !window.AudioContext;
   touchLayout.hidden = false;
+  refreshButton.hidden = !wasm.is_title();
   resizeViewport();
   previousTrafficFrame = performance.now();
   requestAnimationFrame(animateTraffic);
 } catch (error) {
+  refreshButton.hidden = false;
   showStatus("ゲームを読み込めませんでした。「キャッシュを消して再読み込み」をお試しください。");
   console.error(error);
 }
-refreshButton.hidden = false;
 
 window.addEventListener("keydown", (event) => {
   if (!wasm || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;

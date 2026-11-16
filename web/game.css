@@ -50,7 +50,7 @@ canvas {
   gap: 6px 10px;
   margin-top: 8px;
 }
-.toolbar button {
+.toolbar button, #controls #sound-toggle {
   padding-inline: 12px;
   border-color: #746755;
   border-radius: 999px;
@@ -121,8 +121,8 @@ button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
 .actions {
   display: grid;
   grid-template:
-    "map confirm" var(--key)
-    "journal confirm" var(--key)
+    "map sound" auto
+    "journal confirm" auto
     "layout layout" auto
     / var(--key) calc(var(--key) + 8px);
   gap: var(--pad-gap);
@@ -130,6 +130,11 @@ button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
   font-size: 12px;
 }
 #map-control { grid-area: map; }
+#controls #sound-toggle {
+  grid-area: sound;
+  inline-size: 100%;
+  padding-inline: 3px;
+}
 .journal { grid-area: journal; }
 #controls #touch-layout {
   grid-area: layout;
