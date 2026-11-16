@@ -664,6 +664,7 @@ mod tests {
 
     #[test]
     fn dpad_click_and_keyboard_arrows_move_through_the_same_window() {
+        SOUND_ENABLED.set(false);
         for (width, height) in [(800, 600), (1300, 600), (320, 260)] {
             let layout = Layout::new(RECT {
                 right: width,
@@ -694,8 +695,11 @@ mod tests {
                 null(),
             );
             assert!(!window.is_null());
-            window_proc(window, WM_KEYDOWN, 13, 0);
-            window_proc(window, WM_KEYDOWN, 13, 0);
+            SESSION.with(|session| {
+                let game = &mut session.borrow_mut().0;
+                game.input(Key::Confirm);
+                game.input(Key::Confirm);
+            });
 
             let mut client = RECT::default();
             GetClientRect(window, &mut client);
