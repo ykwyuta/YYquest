@@ -213,14 +213,15 @@ impl Island {
 
     pub(crate) fn return_to_harbor(&mut self) {
         (self.x, self.y) = self.harbor;
+        self.walk = Walk::default();
     }
 
     pub(crate) fn step(&mut self, dx: i32, dy: i32) {
         self.facing = Facing::from_step(dx, dy).unwrap_or(self.facing);
         let (x, y) = (self.x + dx, self.y + dy);
         if self.tile(x, y).walkable() {
+            self.walk.step((self.x, self.y), (x, y));
             (self.x, self.y) = (x, y);
-            self.walk.step();
         }
     }
 }

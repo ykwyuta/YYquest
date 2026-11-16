@@ -285,8 +285,8 @@ impl Town {
         self.facing = Facing::from_step(dx, dy).unwrap_or(self.facing);
         let next = (self.pos.0 + dx, self.pos.1 + dy);
         if self.landscape.walkable(next) {
+            self.walk.step(self.pos, next);
             self.pos = next;
-            self.walk.step();
         }
     }
 

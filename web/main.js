@@ -20,6 +20,10 @@ let wasm;
 let previousTrafficFrame = 0;
 let gamepadButtons = 0;
 let readGamepad = typeof navigator.getGamepads === "function";
+const keyboardSource = 1;
+const gamepadSource = 2;
+const touchDirections = new Map();
+const directions = new Set([37, 38, 39, 40, 65, 68, 83, 87]);
 
 function setControlLayout(layout) {
   stage.dataset.controls = layout;
@@ -66,29 +70,34 @@ window.visualViewport?.addEventListener("resize", resizeViewport);
 function animateTraffic(now) {
   pollGamepad();
   const elapsed = Math.floor(now - previousTrafficFrame);
-  if (elapsed >= 65) {
+  if (elapsed >= 16) {
     previousTrafficFrame = now;
-    wasm.animate_traffic(elapsed);
+    if (wasm.animate_traffic(elapsed)) updateControls();
   }
   requestAnimationFrame(animateTraffic);
 }
 
 function pollGamepad() {
-  if (!readGamepad) return;
+  if (!readGamepad || document.hidden || !document.hasFocus()) return;
   let pad;
   try {
     pad = Array.from(navigator.getGamepads()).find((device) => device?.mapping === "standard");
   } catch {
     readGamepad = false;
-    return;
   }
   // Standard Gamepad mapping uses buttons 12–15 for the directional pad.
   const buttons = [[12, 38], [13, 40], [14, 37], [15, 39], [1, 27], [0, 13]];
   let held = 0;
   for (const [index, code] of buttons) {
-    if (!pad?.buttons[index]?.pressed) continue;
-    held |= 1 << index;
-    if (!(gamepadButtons & (1 << index))) sendKey(code);
+    const wasPressed = Boolean(gamepadButtons & (1 << index));
+    const pressed = Boolean(pad?.buttons[index]?.pressed);
+    if (pressed) held |= 1 << index;
+    if (pressed && !wasPressed) {
+      if (directions.has(code)) pressDirection(code, gamepadSource);
+      else sendKey(code);
+    } else if (!pressed && wasPressed && directions.has(code)) {
+      wasm.release_direction(code, gamepadSource);
+    }
   }
   gamepadButtons = held;
 }
@@ -137,6 +146,7 @@ function showStatus(message) {
 }
 
 refreshButton.addEventListener("click", async () => {
+  clearHeldDirections();
   refreshButton.disabled = true;
   showStatus("ゲームファイルを取得し直しています…");
 
@@ -179,9 +189,25 @@ refreshButton.addEventListener("click", async () => {
   }
 });
 
-function sendKey(key, repeat = false) {
+function sendKey(key) {
   if (!wasm || refreshButton.disabled) return;
-  wasm.key(key, repeat);
+  wasm.key(key, false);
+  updateControls();
+}
+
+function pressDirection(code, source) {
+  if (!wasm || refreshButton.disabled) return;
+  wasm.press_direction(code, source);
+  updateControls();
+}
+
+function clearHeldDirections() {
+  touchDirections.clear();
+  gamepadButtons = 0;
+  wasm?.clear_held_direction();
+}
+
+function updateControls() {
   stage.dataset.reading = Boolean(wasm.reading_dialogue?.());
   refreshButton.hidden = !wasm.is_title();
   mapButton.textContent = wasm.debug_back_control() ? "戻る" : "地図";
@@ -214,10 +240,47 @@ window.addEventListener("keydown", (event) => {
   const key = keys.get(event.code);
   if (key === undefined) return;
   event.preventDefault();
-  sendKey(key, event.repeat);
+  if (event.repeat) return;
+  if (directions.has(key)) pressDirection(key, keyboardSource);
+  else sendKey(key);
 });
+
+window.addEventListener("keyup", (event) => {
+  const key = keys.get(event.code);
+  if (directions.has(key)) wasm?.release_direction(key, keyboardSource);
+});
+
+window.addEventListener("blur", clearHeldDirections);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) clearHeldDirections();
+});
+
+const dpad = controls.querySelector(".directions");
+dpad.addEventListener("pointerdown", (event) => {
+  const button = event.target.closest("button[data-key]");
+  if (!button || event.button !== 0 || !wasm || refreshButton.disabled) return;
+  event.preventDefault();
+  button.setPointerCapture(event.pointerId);
+  const code = Number(button.dataset.key);
+  touchDirections.set(event.pointerId, code);
+  pressDirection(code, 3 + event.pointerId);
+});
+
+function releasePointer(event) {
+  const code = touchDirections.get(event.pointerId);
+  if (code === undefined) return;
+  touchDirections.delete(event.pointerId);
+  wasm?.release_direction(code, 3 + event.pointerId);
+}
+
+for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+  dpad.addEventListener(type, releasePointer);
+}
+dpad.addEventListener("contextmenu", (event) => event.preventDefault());
 
 controls.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-key]");
-  if (button) sendKey(Number(button.dataset.key));
+  if (!button) return;
+  const key = Number(button.dataset.key);
+  if (!directions.has(key) || event.detail === 0) sendKey(key);
 });

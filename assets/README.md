@@ -32,6 +32,10 @@
 
 ## 歩行差分
 
+組み込み ImageGen で、既存の歩行アトラスを基に、[踏み出す足を切り替えた差分](prologue-walk-opposite.png)と[片足を持ち上げる差分](prologue-walk-passing.png)を作成しました。
+
+> Match the existing transparent four-direction atlas for Allen and Lilith. For the second contact pose, reverse the lead boot and arm swing. For the passing pose, keep the planted foot under the hips and visibly lift the other boot. Keep the same costumes, facing directions, scale and watercolor style in both two-by-four sheets.
+
 組み込み ImageGen で [歩行差分](prologue-walk.png) を生成しました。既存の4方向アトラスと組み合わせ、移動に合わせて姿勢を切り替えます。
 
 > Create the complementary walking frame for a hand-painted RPG sprite cycle. The attached two-row by four-column transparent sprite atlas is the exact reference for costume, framing, posture, orientation, existing palette, and identity. Output a NEW 2:1 true-alpha PNG with all eight figures in the same positions and directions. Top row Allen in cobalt brown armor with red scarf, bottom row Lilith with silver hair in green cloak. Each row from left to right matches the reference: south/front, west/left profile, east/right profile, north/back. In EVERY image make a clearly different walking pose: exchange which leg leads and which trails, swing the corresponding arms the other way, move scarf and cloak subtly to match the shift in weight. Front and back must visibly shift weight onto the opposite foot, avoid static standing. Preserve face and clothes, body proportions, exact orientation, 3/4-overhead perspective, soft watercolor-gouache edges and scale. Keep large transparent gutters, eight independent silhouettes, no backdrop or drop shadows at all, fully alpha zero around and between each figure. No letters, no extra figures, no border or guides. Alternate step of the SAME walker, frame-compatible with the reference at small game size.

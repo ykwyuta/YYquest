@@ -185,18 +185,20 @@ impl Frame {
         tile: (i32, i32),
         materials: [Ground; 9],
         size: i32,
+        clip: [i32; 4],
     ) {
         let (sx, sy) = (
             screen.0 * DISPLAY_SCALE as i32,
             screen.1 * DISPLAY_SCALE as i32,
         );
         let size = size * DISPLAY_SCALE as i32;
+        let [left, top, right, bottom] = clip.map(|edge| edge * DISPLAY_SCALE as i32);
         let (map_x, map_y) = (tile.0 * size, tile.1 * size);
         let stride = self.buffer_width();
         let center = materials[4];
         let uniform = materials.iter().all(|&ground| ground == center);
-        for py in 0..size {
-            for px in 0..size {
+        for py in (top - sy).max(0)..(bottom - sy).min(size) {
+            for px in (left - sx).max(0)..(right - sx).min(size) {
                 let (x, y) = (map_x + px, map_y + py);
                 let index = (sy + py) as usize * stride + (sx + px) as usize;
                 self.pixels[index] = if uniform || center == Ground::Dock {
@@ -392,16 +394,14 @@ impl Frame {
             ROWS * TILE_SIZE + 2,
             super::LINE,
         );
-        for row in 0..ROWS {
-            for col in 0..view.columns {
-                let (x, y) = (view.camera.0 + col, view.camera.1 + row);
-                self.terrain(
-                    view.point((x, y)),
-                    (x, y),
-                    around(x, y, prologue_ground),
-                    TILE_SIZE,
-                );
-            }
+        for (x, y) in view.visible_tiles() {
+            self.terrain(
+                view.point((x, y)),
+                (x, y),
+                around(x, y, prologue_ground),
+                TILE_SIZE,
+                view.clip,
+            );
         }
 
         for (row, tiles) in MAP.iter().enumerate() {

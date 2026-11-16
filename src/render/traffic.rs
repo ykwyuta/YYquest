@@ -1,6 +1,6 @@
 use super::{
     map_art as art,
-    view::{TILE_SIZE, ZOOM},
+    view::{View, TILE_SIZE, ZOOM},
     Frame, INK,
 };
 use crate::island::{
@@ -9,7 +9,7 @@ use crate::island::{
 };
 
 impl Frame {
-    pub(super) fn draw_rail_tile(&mut self, x: i32, y: i32, directions: u8) {
+    pub(super) fn draw_rail_tile(&mut self, x: i32, y: i32, directions: u8, clip: [i32; 4]) {
         if directions == 0 {
             return;
         }
@@ -17,7 +17,14 @@ impl Frame {
         const TIE: u32 = 0x7c6550;
         const TRACK: u32 = 0xbfb5a4;
         let mut paint = |left, top, w, h, color| {
-            self.rect(x + left * ZOOM, y + top * ZOOM, w * ZOOM, h * ZOOM, color);
+            self.rect_clipped(
+                x + left * ZOOM,
+                y + top * ZOOM,
+                w * ZOOM,
+                h * ZOOM,
+                clip,
+                color,
+            );
         };
         for direction in [NORTH, SOUTH] {
             if directions & direction == 0 {
@@ -69,10 +76,12 @@ impl Frame {
         }
     }
 
-    pub(super) fn draw_traffic(&mut self, island: &Island, camera: (i32, i32), clip: [i32; 4]) {
+    pub(super) fn draw_traffic(&mut self, island: &Island, view: View) {
+        let clip = view.clip;
+        let (origin_x, origin_y) = view.point((0, 0));
         for motion in island.traffic.vehicles() {
-            let x = clip[0] + (motion.x - camera.0 * 16) * TILE_SIZE / 16;
-            let y = clip[1] + (motion.y - camera.1 * 16) * TILE_SIZE / 16;
+            let x = origin_x + motion.x * TILE_SIZE / 16;
+            let y = origin_y + motion.y * TILE_SIZE / 16;
             let train = motion.vehicle == Vehicle::Train;
             let sprite = match (motion.vehicle, motion.direction) {
                 (Vehicle::Train, NORTH) => art::TRAIN_NORTH,

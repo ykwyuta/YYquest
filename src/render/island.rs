@@ -13,8 +13,7 @@ use crate::{
 impl Frame {
     pub(super) fn draw_island(&mut self, island: &Island, guide_site: Option<usize>) {
         let player = (island.x, island.y);
-        let view = View::new(self.width as i32, player, (WIDTH, HEIGHT));
-        let (camera_x, camera_y) = view.camera;
+        let view = View::following(self.width as i32, player, (WIDTH, HEIGHT), &island.walk);
         let (title, _) = island.region.caption();
         self.label(view.left, 6, 12, GOLD, title);
         self.label(view.clip[2] - 101, 8, 9, MIST, "M / Esc  全体図");
@@ -26,55 +25,60 @@ impl Frame {
             LINE,
         );
 
-        for screen_y in 0..ROWS {
-            for screen_x in 0..view.columns {
-                let map_x = camera_x + screen_x;
-                let map_y = camera_y + screen_y;
-                self.terrain(
-                    (view.left + screen_x * TILE_SIZE, TOP + screen_y * TILE_SIZE),
-                    (map_x, map_y),
-                    art::around(map_x, map_y, |x, y| Self::ground(island, x, y)),
-                    TILE_SIZE,
-                );
-                if island.tile(map_x, map_y) == Tile::Cliff
-                    && island.tile(map_x, map_y + 1) != Tile::Cliff
-                {
-                    let screen_x = view.left + screen_x * TILE_SIZE;
-                    let foot = TOP + (screen_y + 1) * TILE_SIZE;
-                    let rock = if island.region == Region::Celestia {
-                        0x777568
-                    } else {
-                        0x4a4244
-                    };
-                    let shade = if island.region == Region::Celestia {
-                        0x56564d
-                    } else {
-                        0x36313a
-                    };
-                    for offset in 0..TILE_SIZE {
-                        let height = 1 + i32::from(
-                            crate::noise::hash(map_x * TILE_SIZE + offset, map_y) & 7 < 3,
-                        );
-                        self.rect(screen_x + offset, foot - height - 1, 1, 1, rock);
-                        self.rect(screen_x + offset, foot - height, 1, height, shade);
-                    }
+        for (map_x, map_y) in view.visible_tiles() {
+            let (screen_x, screen_y) = view.point((map_x, map_y));
+            self.terrain(
+                (screen_x, screen_y),
+                (map_x, map_y),
+                art::around(map_x, map_y, |x, y| Self::ground(island, x, y)),
+                TILE_SIZE,
+                view.clip,
+            );
+            if island.tile(map_x, map_y) == Tile::Cliff
+                && island.tile(map_x, map_y + 1) != Tile::Cliff
+            {
+                let foot = screen_y + TILE_SIZE;
+                let rock = if island.region == Region::Celestia {
+                    0x777568
+                } else {
+                    0x4a4244
+                };
+                let shade = if island.region == Region::Celestia {
+                    0x56564d
+                } else {
+                    0x36313a
+                };
+                for offset in 0..TILE_SIZE {
+                    let height = 1 + i32::from(
+                        crate::noise::hash(map_x * TILE_SIZE + offset, map_y) & 7 < 3,
+                    );
+                    self.rect_clipped(screen_x + offset, foot - height - 1, 1, 1, view.clip, rock);
+                    self.rect_clipped(
+                        screen_x + offset,
+                        foot - height,
+                        1,
+                        height,
+                        view.clip,
+                        shade,
+                    );
                 }
-                self.draw_rail_tile(
-                    view.left + screen_x * TILE_SIZE,
-                    TOP + screen_y * TILE_SIZE,
-                    island.traffic.tracks_at(map_x, map_y),
-                );
             }
+            self.draw_rail_tile(
+                screen_x,
+                screen_y,
+                island.traffic.tracks_at(map_x, map_y),
+                view.clip,
+            );
         }
         self.draw_island_objects(island, view);
         self.draw_settlements(island, view);
-        self.draw_traffic(island, view.camera, view.clip);
+        self.draw_traffic(island, view);
         self.draw_fauna(island, view);
         self.draw_explorer(
-            allen(island.facing, island.walk.alternate()),
+            allen(island.facing, island.walk.pose()),
             view,
             player,
-            island.walk.lift(),
+            &island.walk,
         );
         let destination = guide_site.map(|index| &island.settlements()[index]);
         if let Some(destination) = destination {
@@ -285,34 +289,29 @@ impl Frame {
                     let size = size * ZOOM as usize;
                     let jitter_x = ((variation & 3) as i32 - 1) * ZOOM;
                     let jitter_y = (((variation >> 2) & 3) as i32 - 1) * ZOOM;
+                    let (px, py) = view.feet((x, y));
                     self.art_clipped(
                         sprite,
-                        view.left + sx * TILE_SIZE + TILE_SIZE / 2 - size as i32 / 2 + jitter_x,
-                        TOP + sy * TILE_SIZE + TILE_SIZE - size as i32 + jitter_y,
+                        px - size as i32 / 2 + jitter_x,
+                        py + 3 - size as i32 + jitter_y,
                         size,
                         view.clip,
                     );
                 }
             }
         }
-        for sy in 0..ROWS {
-            for sx in 0..view.columns {
-                if matches!(island.tile(camera_x + sx, camera_y + sy), Tile::Landmark(_)) {
-                    let px = view.left + sx * TILE_SIZE + TILE_SIZE / 2;
-                    let py = TOP + sy * TILE_SIZE + TILE_SIZE - 4;
-                    self.site_marker(px, py, GOLD);
-                }
+        for (x, y) in view.visible_tiles() {
+            if matches!(island.tile(x, y), Tile::Landmark(_)) {
+                let (px, py) = view.feet((x, y));
+                self.site_marker(px, py - 1, view.clip, GOLD);
             }
         }
     }
 
     fn draw_settlements(&mut self, island: &Island, view: View) {
-        let (camera_x, camera_y) = view.camera;
-
         for (index, site) in island.settlements().iter().enumerate() {
             let size = site.sprite_size() * ZOOM as usize;
-            let door_x = view.left + (site.door.0 - camera_x) * TILE_SIZE;
-            let door_y = TOP + (site.door.1 - camera_y) * TILE_SIZE;
+            let (door_x, door_y) = view.point(site.door);
             self.art_clipped(
                 art::settlement(island.region, index),
                 door_x + TILE_SIZE / 2 - size as i32 / 2,
@@ -329,22 +328,25 @@ impl Frame {
                 } else {
                     GOLD
                 };
-                self.site_marker(door_x + TILE_SIZE / 2, door_y + TILE_SIZE - 4, marker);
+                self.site_marker(
+                    door_x + TILE_SIZE / 2,
+                    door_y + TILE_SIZE - 4,
+                    view.clip,
+                    marker,
+                );
             }
         }
     }
 
     fn draw_fauna(&mut self, island: &Island, view: View) {
-        let (camera_x, camera_y) = view.camera;
         for creature in island
             .fauna
             .creatures()
             .iter()
             .filter(|creature| creature.active)
         {
-            let (x, y) = creature.position;
-            let center = view.left + (x - camera_x) * TILE_SIZE + TILE_SIZE / 2;
-            let feet = TOP + (y - camera_y + 1) * TILE_SIZE - 1;
+            let (center, y) = view.feet(creature.position);
+            let feet = y + 2;
             let beast = creature.species.is_beast();
             let size = (if beast { 24 } else { 16 }) * ZOOM as usize;
             if (view.left + 4..view.clip[2] - 4).contains(&center)
@@ -364,11 +366,11 @@ impl Frame {
         }
     }
 
-    fn site_marker(&mut self, x: i32, y: i32, color: u32) {
-        self.rect(x - 3, y - 1, 7, 3, INK);
-        self.rect(x - 1, y - 3, 3, 7, INK);
-        self.rect(x - 2, y, 5, 1, color);
-        self.rect(x, y - 2, 1, 5, color);
-        self.rect(x, y, 1, 1, IVORY);
+    fn site_marker(&mut self, x: i32, y: i32, clip: [i32; 4], color: u32) {
+        self.rect_clipped(x - 3, y - 1, 7, 3, clip, INK);
+        self.rect_clipped(x - 1, y - 3, 3, 7, clip, INK);
+        self.rect_clipped(x - 2, y, 5, 1, clip, color);
+        self.rect_clipped(x, y - 2, 1, 5, clip, color);
+        self.rect_clipped(x, y, 1, 1, clip, IVORY);
     }
 }

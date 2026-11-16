@@ -111,9 +111,16 @@ has("炉番に水門");
 expectedWidth = 640;
 wasm.set_view_width(320);
 
-press(up);
+wasm.press_direction(down, 1);
+hasDialogue("守護精霊が導くほうに進んでみよう");
+press(enter);
+has("炉番に水門");
+wasm.release_direction(down, 1);
+wasm.press_direction(up, 1);
 assert.equal(wasm.animate_traffic(80), 1);
-press(up, enter);
+assert.equal(wasm.animate_traffic(64), 1);
+wasm.release_direction(up, 1);
+press(enter);
 hasDialogue("東の森で笛");
 has("炉番");
 assert.equal(wasm.reading_dialogue(), 1);

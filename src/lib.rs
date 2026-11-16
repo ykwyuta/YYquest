@@ -7,6 +7,7 @@ pub mod game;
 mod intro;
 mod island;
 mod noise;
+mod path;
 pub mod render;
 mod town;
 mod walk;
@@ -117,5 +118,22 @@ mod web {
         if SESSION.with(|session| session.borrow_mut().0.input_code(code, repeat)) {
             draw();
         }
+    }
+
+    #[no_mangle]
+    extern "C" fn press_direction(code: u32, source: u32) {
+        if SESSION.with(|session| session.borrow_mut().0.press_direction(code, source)) {
+            draw();
+        }
+    }
+
+    #[no_mangle]
+    extern "C" fn release_direction(code: u32, source: u32) {
+        SESSION.with(|session| session.borrow_mut().0.release_direction(code, source));
+    }
+
+    #[no_mangle]
+    extern "C" fn clear_held_direction() {
+        SESSION.with(|session| session.borrow_mut().0.clear_held_direction());
     }
 }

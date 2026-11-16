@@ -1,4 +1,5 @@
 use crate::game::{Enemy, Facing, Game, Scene, COMMANDS, MAX_HP, MEMORIES};
+use crate::walk::Pose;
 
 mod debug;
 mod economy;
@@ -38,18 +39,18 @@ const _: () = {
     assert!(art_sizes::TITLE_HEIGHT == BUFFER_HEIGHT);
 };
 
-fn allen(facing: Facing, alternate: bool) -> Sprite {
-    character_sprite(8 * usize::from(alternate) + facing as usize)
+fn allen(facing: Facing, pose: Pose) -> Sprite {
+    character_sprite(8 * pose as usize + facing as usize)
 }
 
-fn lilith(facing: Facing, alternate: bool) -> Sprite {
-    character_sprite(8 * usize::from(alternate) + 4 + facing as usize)
+fn lilith(facing: Facing, pose: Pose) -> Sprite {
+    character_sprite(8 * pose as usize + 4 + facing as usize)
 }
 
 fn character_sprite(index: usize) -> Sprite {
     const SIDE: usize = art_sizes::PORTRAIT;
     const STRIDE: usize = SIDE * SIDE * 4;
-    const ATLAS: &[u8; 16 * STRIDE] =
+    const ATLAS: &[u8; 32 * STRIDE] =
         include_bytes!(concat!(env!("OUT_DIR"), "/prologue-characters.rgba"));
     Sprite::new(&ATLAS[index * STRIDE..(index + 1) * STRIDE], SIDE)
 }
@@ -115,6 +116,15 @@ impl Frame {
         let stride = self.buffer_width();
         for row in top * DISPLAY_SCALE..bottom * DISPLAY_SCALE {
             self.pixels[row * stride + left..row * stride + right].fill(color);
+        }
+    }
+
+    fn rect_clipped(&mut self, x: i32, y: i32, w: i32, h: i32, clip: [i32; 4], color: u32) {
+        let [left, top, right, bottom] = clip;
+        let (start_x, start_y) = (x.max(left), y.max(top));
+        let (end_x, end_y) = ((x + w).min(right), (y + h).min(bottom));
+        if start_x < end_x && start_y < end_y {
+            self.rect(start_x, start_y, end_x - start_x, end_y - start_y, color);
         }
     }
 
@@ -263,12 +273,9 @@ impl Frame {
     }
 
     fn field(&mut self, game: &Game) {
-        let map_size = (
-            crate::game::MAP[0].len() as i32,
-            crate::game::MAP.len() as i32,
-        );
+        let map_size = crate::game::PROLOGUE_SIZE;
         let player = (game.x, game.y);
-        let view = view::View::new(self.width as i32, player, map_size);
+        let view = view::View::following(self.width as i32, player, map_size, &game.walk);
         self.label(view.left, 7, 12, GOLD, "黄昏の辺境領ノクス");
         self.label(
             view.clip[2] - 82,
@@ -279,9 +286,9 @@ impl Frame {
         );
         self.draw_prologue_landscape(view);
         if let Some(at) = game.companion_position {
-            let (x, y) = view.feet(at);
+            let (x, y) = view.walking_feet(at, &game.companion_walk);
             self.art_clipped(
-                lilith(game.companion_facing, game.companion_walk.alternate()),
+                lilith(game.companion_facing, game.companion_walk.pose()),
                 x - 14,
                 y - 28 - game.companion_walk.lift(),
                 28,
@@ -292,7 +299,7 @@ impl Frame {
             let (x, y) = view.feet(at);
             let offset = if at == player { 12 } else { 0 };
             self.art_clipped(
-                lilith(Facing::South, false),
+                lilith(Facing::South, Pose::Standing),
                 x - 14 + offset,
                 y - 28,
                 28,
@@ -300,10 +307,10 @@ impl Frame {
             );
         }
         self.draw_explorer(
-            allen(game.facing, game.walk.alternate()),
+            allen(game.facing, game.walk.pose()),
             view,
             player,
-            game.walk.lift(),
+            &game.walk,
         );
         if game.message.is_none() && !game.journal && game.intro != crate::intro::Intro::Nox {
             let target = game.intro.destination().0;
@@ -374,7 +381,11 @@ impl Frame {
         self.rect(114, 122, 92, 3, 0x283449);
         self.art(art, 112, 34, 96);
         let enemy_name = battle.enemy.name();
-        let name_size = if enemy_name.chars().count() > 9 { 9 } else { 11 };
+        let name_size = if enemy_name.chars().count() > 9 {
+            9
+        } else {
+            11
+        };
         self.label(16, 5, name_size, GOLD, enemy_name);
         let enemy_max = battle.enemy.hp();
         self.label(125, 7, 9, IVORY, format!("HP {}/{enemy_max}", battle.hp));
@@ -454,8 +465,8 @@ impl Frame {
     fn conclusion(&mut self, game: &Game, won: bool) {
         self.landscape(0, 0, 320, 144);
         let (title, color, first, second) = if won {
-            self.art(allen(Facing::South, false), 109, 73, 56);
-            self.art(lilith(Facing::South, false), 155, 74, 56);
+            self.art(allen(Facing::South, Pose::Standing), 109, 73, 56);
+            self.art(lilith(Facing::South, Pose::Standing), 155, 74, 56);
             (
                 "第一章　ノクス　完",
                 GOLD,

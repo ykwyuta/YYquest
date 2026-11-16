@@ -15,7 +15,7 @@ use crate::{
 impl Frame {
     pub(super) fn draw_town(&mut self, town: &Town, states: &[State; 5]) {
         let plan = town.plan();
-        let view = View::new(self.width as i32, town.pos, (WIDTH, HEIGHT));
+        let view = View::following(self.width as i32, town.pos, (WIDTH, HEIGHT), &town.walk);
         let camera = view.camera;
         let point = |at| view.point(at);
         self.rect(
@@ -25,18 +25,16 @@ impl Frame {
             ROWS * TILE_SIZE + 2,
             LINE,
         );
-        for row in 0..ROWS {
-            for col in 0..view.columns {
-                let at = (camera.0 + col, camera.1 + row);
-                self.terrain(
-                    point(at),
-                    at,
-                    art::around(at.0, at.1, |x, y| {
-                        ground(town.landscape.surface((x, y)), x, y)
-                    }),
-                    TILE_SIZE,
-                );
-            }
+        for at in view.visible_tiles() {
+            self.terrain(
+                point(at),
+                at,
+                art::around(at.0, at.1, |x, y| {
+                    ground(town.landscape.surface((x, y)), x, y)
+                }),
+                TILE_SIZE,
+                view.clip,
+            );
         }
 
         // Low roadside foliage is drawn before buildings and people.
@@ -141,9 +139,7 @@ impl Frame {
                 }
                 props.next();
             }
-            if (camera.1..camera.1 + ROWS).contains(&row) {
-                draw_npcs(self, row);
-            }
+            draw_npcs(self, row);
         }
         let (x, y) = point((plan.entry.0 + 2, plan.entry.1 - 2));
         if (view.left + 2..view.clip[2] - 12).contains(&x)
@@ -157,10 +153,10 @@ impl Frame {
         }
 
         self.draw_explorer(
-            allen(town.facing, town.walk.alternate()),
+            allen(town.facing, town.walk.pose()),
             view,
             town.pos,
-            town.walk.lift(),
+            &town.walk,
         );
         let destination = town.guide_destination(states);
         let remaining = if let (Panel::Explore, Some((target, _))) = (town.panel, destination) {
