@@ -1,3 +1,4 @@
+mod gathering;
 mod map;
 mod nox;
 #[cfg(test)]
@@ -13,6 +14,7 @@ use crate::{
     game::{Facing, Key},
     island::Position,
 };
+pub(crate) use gathering::Gathering;
 pub(crate) use map::{Landscape, Surface, HEIGHT, WIDTH};
 use nox::NOX;
 
@@ -208,6 +210,7 @@ pub(crate) struct Town {
     pub(crate) low_tide: bool,
     pub(crate) main: Option<&'static ChapterBeat>,
     pub(crate) walk: Walk,
+    pub(crate) gathering: Option<Gathering>,
     track_side: bool,
 }
 
@@ -231,6 +234,7 @@ impl Town {
             low_tide: false,
             main: None,
             walk: Walk::default(),
+            gathering: None,
             track_side: false,
         }
     }

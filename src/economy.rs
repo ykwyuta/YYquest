@@ -150,7 +150,6 @@ pub(crate) enum Service {
     Brew,
     Forge,
     Rest(u32),
-    Gather(&'static [(Item, u8)]),
 }
 
 impl Service {
@@ -161,9 +160,6 @@ impl Service {
             (1, 1) | (2, 1) | (9, 2) => Self::Shop,
             (0, 7) => Self::Brew,
             (5, 1) => Self::Forge,
-            (0, 3) => Self::Gather(&[(AshHerb, 3), (AshWood, 2)]),
-            (1, 6) => Self::Gather(&[(BitterRoot, 2)]),
-            (5, 3) => Self::Gather(&[(BogIron, 3)]),
             _ => return None,
         })
     }
@@ -175,7 +171,6 @@ impl Service {
             Self::Forge => "鍛冶屋で装備を作る",
             Self::Rest(0) => "無料で手当てを受ける",
             Self::Rest(_) => "旅籠で休む",
-            Self::Gather(_) => "素材を採集する",
         }
     }
 }
@@ -190,7 +185,6 @@ pub(crate) enum Page {
     Brew,
     Forge,
     Rest(u32),
-    Gather(&'static [(Item, u8)]),
 }
 
 #[derive(Clone, Copy)]
@@ -202,7 +196,16 @@ pub(crate) enum OptionRow {
     Item(Item),
     Craft(&'static Recipe),
     Rest(u32),
-    Gather(Item, u8),
+}
+
+impl OptionRow {
+    pub(crate) fn item(self) -> Option<Item> {
+        match self {
+            Self::Buy(item) | Self::Sell(item) | Self::Item(item) => Some(item),
+            Self::Craft(recipe) => Some(recipe.output),
+            _ => None,
+        }
+    }
 }
 
 pub(crate) struct Menu {
@@ -228,7 +231,6 @@ impl Menu {
             Service::Brew => Page::Brew,
             Service::Forge => Page::Forge,
             Service::Rest(cost) => Page::Rest(cost),
-            Service::Gather(items) => Page::Gather(items),
         })
     }
 
@@ -259,7 +261,6 @@ impl Menu {
             Page::Brew => BREW.iter().map(Craft).collect(),
             Page::Forge => FORGE.iter().map(Craft).collect(),
             Page::Rest(cost) => vec![Rest(cost)],
-            Page::Gather(items) => items.iter().map(|&(item, n)| Gather(item, n)).collect(),
         }
     }
 }
@@ -349,6 +350,15 @@ impl Goods {
         self.picked_at[item as usize].map_or(0, |step| 96_u64.saturating_sub(self.steps - step))
     }
 
+    pub(crate) fn gather(&mut self, item: Item, quantity: u8) -> Result<(), &'static str> {
+        if self.gather_wait(item) != 0 {
+            return Err("まだ採集できない。");
+        }
+        self.add(item, quantity)?;
+        self.picked_at[item as usize] = Some(self.steps);
+        Ok(())
+    }
+
     fn add(&mut self, item: Item, quantity: u8) -> Result<(), &'static str> {
         let count = &mut self.stock[item as usize];
         if *count + quantity > 99 {
@@ -418,14 +428,6 @@ impl Goods {
                 self.hp = MAX_HP;
                 "体力が全回復した。".into()
             }
-            Gather(item, quantity) => {
-                if self.gather_wait(item) > 0 {
-                    return Err("まだ採集できない。");
-                }
-                self.add(item, quantity)?;
-                self.picked_at[item as usize] = Some(self.steps);
-                format!("{}を {quantity} 個採集した。", item.name())
-            }
             Item(item) => {
                 match item.data().1 {
                     Kind::Weapon(_) => self.weapon = item,
@@ -461,5 +463,27 @@ impl Goods {
         };
         self.stock[item as usize] -= 1;
         Ok(damage)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn harvesting_replenishes_after_walking_and_keeps_full_bag_plants() {
+        let mut goods = Goods::new();
+        goods.stock[AshHerb as usize] = 98;
+        assert!(goods.gather(AshHerb, 3).is_err());
+        assert_eq!((goods.count(AshHerb), goods.gather_wait(AshHerb)), (98, 0));
+
+        goods.stock[AshHerb as usize] = 96;
+        assert!(goods.gather(AshHerb, 3).is_ok());
+        assert_eq!((goods.count(AshHerb), goods.gather_wait(AshHerb)), (99, 96));
+        assert!(goods.gather(AshHerb, 3).is_err());
+        for _ in 0..96 {
+            goods.walked();
+        }
+        assert_eq!(goods.gather_wait(AshHerb), 0);
     }
 }

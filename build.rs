@@ -124,6 +124,29 @@ fn main() {
         }
     }
     fs::write(out.join("dialogue-faces.rgba"), faces).unwrap();
+    let mut icons = Vec::new();
+    // Keep the packed artwork in Item's discriminant order.
+    for name in [
+        "rusty-sword",
+        "ash-herb",
+        "bitter-root",
+        "bog-iron",
+        "ash-wood",
+        "beast-hide",
+        "echo-shard",
+        "poultice",
+        "tonic",
+        "spark-tube",
+        "iron-sword",
+        "echo-blade",
+        "leather-coat",
+        "riveted-coat",
+        "mist-charm",
+    ] {
+        let icon = load(&format!("assets/items/{name}.png"));
+        icons.extend(fit_sprite(&icon, name, art_sizes::ITEM).into_raw());
+    }
+    fs::write(out.join("items.rgba"), icons).unwrap();
     for (name, path) in [
         ("slime", "assets/slime.png"),
         ("bat", "assets/bat.png"),

@@ -36,7 +36,7 @@ function hasTitle() {
 }
 function hasDialogue(line) {
   assert.ok(labels.join("").includes(line), labels.join(" / "));
-  assert.ok(!labels.some((text) => text.includes("案内精霊") || text.includes("移動　　決定　会話・調査")),
+  assert.ok(!labels.some((text) => text.startsWith("案内精霊：") || text.includes("移動　　決定　会話・調査")),
     labels.join(" / "));
 }
 
@@ -75,11 +75,17 @@ press(enter, enter);
 has("警備隊が避難してきた人");
 press(enter);
 has("精霊　冬越し小屋へ");
+press(...Array(20).fill(up), ...Array(65).fill(right), down);
+has("決定で刈り取る");
+press(enter, enter);
+has("灰葉草を3個刈り取った");
+has("再び採れるまで 96 歩");
 press(escape);
 has("街・村");
 press(journal);
-has("荷袋");
+has("持ち物");
 has("24銀環");
+has("灰葉草 ×3");
 has("灰葉の傷薬");
 press(escape);
 has("街・村");
@@ -95,7 +101,7 @@ hasTitle();
 // Enter the redesigned tutorial and verify the wide field and overview widths.
 press(enter);
 assert.equal(wasm.is_title(), 0);
-hasDialogue("森から水が届かなくなった");
+hasDialogue("灰灯りの村へ水が来なくなった");
 assert.equal(wasm.has_map_control(), 0);
 press(enter);
 has("炉番に水門");
@@ -112,7 +118,7 @@ expectedWidth = 640;
 wasm.set_view_width(320);
 
 wasm.press_direction(down, 1);
-hasDialogue("守護精霊が導くほうに進んでみよう");
+hasDialogue("光のあとをたどって");
 press(enter);
 has("炉番に水門");
 wasm.release_direction(down, 1);
@@ -121,7 +127,7 @@ assert.equal(wasm.animate_traffic(80), 1);
 assert.equal(wasm.animate_traffic(64), 1);
 wasm.release_direction(up, 1);
 press(enter);
-hasDialogue("東の森で笛");
+hasDialogue("東の森から笛の音");
 has("炉番");
 assert.equal(wasm.reading_dialogue(), 1);
 press(enter, down, down, ...Array(10).fill(right), down, down, enter);
@@ -138,21 +144,21 @@ press(down, enter);
 has("HP 0/12");
 has("父の最後の言葉");
 press(enter);
-hasDialogue("水が流れ出し");
+hasDialogue("水路が通ったね");
 press(enter, journal);
 has("記憶が風化した");
 assert.ok(!labels.includes("父の最後の言葉"));
 
 press(journal, right, right, right, up, up, up, up, up, right, enter, enter);
 has("忘却の獣");
-has("記憶を消費しない");
+has("記憶を使わずリリスと協力");
 press(down, down, enter, enter, enter, enter, enter, enter, enter, enter);
 hasDialogue("三つの灯");
-has("石碑に残った声");
+has("石碑から響く過去の声");
 press(enter);
-hasDialogue("一緒に行く");
+hasDialogue("一緒に来てくれないか");
 press(enter);
-hasDialogue("私も一緒に行く");
+hasDialogue("私も行く");
 has("リリス");
 press(enter);
 hasDialogue("リリスが仲間になった");
@@ -176,7 +182,7 @@ press(escape, escape, escape);
 has("デバッグモード");
 press(escape, escape, down, enter, enter, enter, down, enter);
 has("炉の名札");
-has("名札のない薪束");
+has("私の薪束には刻み目");
 has("夜番");
 assert.ok(labels.some((text) => text.startsWith("「")));
 press(enter);

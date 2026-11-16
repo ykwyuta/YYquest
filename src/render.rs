@@ -211,7 +211,7 @@ impl Frame {
         self.pixels.fill(NIGHT);
         self.labels.clear();
         if game.map_open {
-            self.draw_world_map(&game.world_map);
+            self.draw_world_map(&game.world_map, &game.goods);
             if let Some(menu) = &game.economy_menu {
                 self.draw_economy(menu, &game.goods, game.goods.hp);
             }
