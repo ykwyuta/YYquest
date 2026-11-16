@@ -2,30 +2,36 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#111524">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0e19">
   <title>残響のアルカディア</title>
   <link rel="stylesheet" href="./game.css">
   <script type="module" src="./main.js"></script>
 </head>
 <body>
   <main>
-    <canvas id="game" width="640" height="480" aria-label="残響のアルカディア"></canvas>
-    <p id="status" role="status">読み込み中…</p>
-    <button id="cache-refresh" type="button" hidden>キャッシュを消して再読み込み</button>
-    <div id="controls" aria-label="ゲーム操作" hidden>
-      <div class="directions">
-        <button class="up" data-key="38" aria-label="上">↑</button>
-        <button class="left" data-key="37" aria-label="左">←</button>
-        <button class="down" data-key="40" aria-label="下">↓</button>
-        <button class="right" data-key="39" aria-label="右">→</button>
-      </div>
-      <div class="actions">
-        <button id="map-control" data-key="77" hidden>地図</button>
-        <button data-key="74">手記</button>
-        <button class="confirm" data-key="13">決定</button>
+    <p id="rotate-tip">画面を横向きにすると、広く表示できます。</p>
+    <div class="game-stage" data-controls="overlay">
+      <canvas id="game" width="640" height="480" aria-label="残響のアルカディア"></canvas>
+      <div id="controls" aria-label="ゲーム操作" hidden>
+        <div class="directions" role="group" aria-label="十字キー">
+          <button type="button" class="up" data-key="38" aria-label="上">↑</button>
+          <button type="button" class="left" data-key="37" aria-label="左">←</button>
+          <button type="button" class="down" data-key="40" aria-label="下">↓</button>
+          <button type="button" class="right" data-key="39" aria-label="右">→</button>
+        </div>
+        <div class="actions" role="group" aria-label="アクション">
+          <button type="button" id="map-control" data-key="77" hidden>地図</button>
+          <button type="button" class="journal" data-key="74">手記</button>
+          <button type="button" class="confirm" data-key="13">決定</button>
+        </div>
       </div>
     </div>
+    <div class="toolbar">
+      <button id="touch-layout" type="button" aria-controls="controls" hidden>操作を画面の外へ</button>
+      <button id="cache-refresh" type="button" hidden>キャッシュを消して再読み込み</button>
+    </div>
+    <p id="status" role="status">読み込み中…</p>
   </main>
 </body>
 </html>

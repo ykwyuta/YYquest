@@ -1,3 +1,5 @@
+pub(crate) const TITLE_WIDTH: usize = 640;
+pub(crate) const TITLE_HEIGHT: usize = 480;
 pub(crate) const PORTRAIT: usize = 192;
 pub(crate) const MAP_OBJECT: usize = 96;
 pub(crate) const SETTLEMENT: usize = 144;

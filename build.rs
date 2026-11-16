@@ -65,6 +65,18 @@ fn fit_sprite(image: &RgbaImage, name: &str, side: usize) -> RgbaImage {
 fn main() {
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     map_art::build(&out);
+    let title = load("assets/title-arcadia.png");
+    let title = imageops::resize(
+        &title,
+        art_sizes::TITLE_WIDTH as u32,
+        art_sizes::TITLE_HEIGHT as u32,
+        imageops::FilterType::Lanczos3,
+    );
+    let title: Vec<u8> = title
+        .pixels()
+        .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
+        .collect();
+    fs::write(out.join("title.rgb"), title).unwrap();
     let heroes = load("assets/prologue-characters.png");
     let half = heroes.width() / 2;
     for (name, offset) in [("allen", 0), ("lilith", half)] {

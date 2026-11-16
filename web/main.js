@@ -5,6 +5,9 @@ let image;
 const decoder = new TextDecoder();
 const status = document.querySelector("#status");
 const controls = document.querySelector("#controls");
+const stage = document.querySelector(".game-stage");
+const touchLayout = document.querySelector("#touch-layout");
+const layoutPreference = "yyquest-touch-controls";
 const refreshButton = document.querySelector("#cache-refresh");
 const mapButton = document.querySelector("#map-control");
 const refreshParam = "_yyrefresh";
@@ -17,6 +20,27 @@ let wasm;
 let previousTrafficFrame = 0;
 let gamepadButtons = 0;
 let readGamepad = typeof navigator.getGamepads === "function";
+
+function setControlLayout(layout) {
+  stage.dataset.controls = layout;
+  touchLayout.textContent = layout === "outside" ? "操作を画面に戻す" : "操作を画面の外へ";
+}
+
+try {
+  if (localStorage.getItem(layoutPreference) === "outside") setControlLayout("outside");
+} catch {
+  // Touch controls still work when browser storage is unavailable.
+}
+
+touchLayout.addEventListener("click", () => {
+  const layout = stage.dataset.controls === "outside" ? "overlay" : "outside";
+  setControlLayout(layout);
+  try {
+    localStorage.setItem(layoutPreference, layout);
+  } catch {
+    // Keep the selection for the current visit.
+  }
+});
 
 function animateTraffic(now) {
   pollGamepad();
@@ -65,9 +89,12 @@ const screen = {
     }
     view.putImageData(image, 0, 0);
   },
-  text(x, y, size, color, address, length) {
+  text(x, y, size, color, address, length, serif) {
     const bytes = new Uint8Array(wasm.memory.buffer, address, length);
-    view.font = `600 ${size * coordinateScale}px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif`;
+    const face = serif
+      ? '"Yu Mincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", serif'
+      : '"Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif';
+    view.font = `600 ${size * coordinateScale}px ${face}`;
     view.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
     view.textBaseline = "top";
     view.fillText(decoder.decode(bytes), x * coordinateScale, y * coordinateScale);
@@ -147,6 +174,7 @@ try {
   mapButton.hidden = !wasm.has_map_control();
   status.hidden = true;
   controls.hidden = false;
+  touchLayout.hidden = false;
   previousTrafficFrame = performance.now();
   requestAnimationFrame(animateTraffic);
 } catch (error) {
