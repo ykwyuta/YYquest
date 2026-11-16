@@ -20,13 +20,13 @@ pub(crate) enum Intro {
 impl Intro {
     pub(crate) fn destination(self) -> (Position, &'static str) {
         match self {
-            Self::Hearth => (HEARTH, "案内精霊　炉番に水門のことを聞こう。"),
-            Self::Meeting => (MEETING, "案内精霊　東の森で笛の音を探そう。"),
-            Self::Sluice => (SLUICE, "案内精霊　旧水門へ。"),
-            Self::Memorial => (MEMORIAL, "案内精霊　北の石碑でリリスと落ち合おう。"),
-            Self::Choice => (MEMORIAL, "石碑の前でリリスの返事を聞く。"),
-            Self::Return => (HEARTH, "案内精霊　二人で炉番に報告しよう。"),
-            Self::Nox => (HEARTH, "地図（M）からノクス編の探索に戻れる。"),
+            Self::Hearth => (HEARTH, "案内精霊：炉番に水門のことを聞こう"),
+            Self::Meeting => (MEETING, "案内精霊：東の森で笛の音を探そう"),
+            Self::Sluice => (SLUICE, "案内精霊：森の旧水門へ向かおう"),
+            Self::Memorial => (MEMORIAL, "案内精霊：北の石碑でリリスと合流しよう"),
+            Self::Choice => (MEMORIAL, "案内精霊：石碑の前でリリスの話を聞こう"),
+            Self::Return => (HEARTH, "案内精霊：二人で炉番に報告しよう"),
+            Self::Nox => (HEARTH, "地図（M）でノクスの各地を巡ろう"),
         }
     }
 

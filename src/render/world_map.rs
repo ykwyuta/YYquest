@@ -30,7 +30,7 @@ impl Frame {
                     if world.campaign.reading {
                         "決定　続ける"
                     } else {
-                        "決定　本編を調べる"
+                        "決定　今の目的"
                     },
                 );
             }

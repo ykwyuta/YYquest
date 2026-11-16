@@ -11,13 +11,13 @@ impl Frame {
         self.labels.clear();
         self.panel(x, 17, width, 200);
         let title = match menu.page {
-            Page::Bag => "荷袋",
+            Page::Bag => "持ち物",
             Page::Battle => "戦闘道具",
-            Page::Shop => "よろず商",
+            Page::Shop => "よろず屋",
             Page::Buy => "品物を買う",
             Page::Sell => "素材を売る",
-            Page::Brew => "炊事場の調薬",
-            Page::Forge => "ドワーフ鍛冶師の工房",
+            Page::Brew => "薬の調合",
+            Page::Forge => "鍛冶工房",
             Page::Rest(_) => "休息・手当て",
             Page::Gather(_) => "採集できる素材",
         };

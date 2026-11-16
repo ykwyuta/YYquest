@@ -4,97 +4,97 @@ use crate::dialogue::Speaker::*;
 pub(super) static NOX: [Plan; 10] = [
     Plan {
         name: "灰灯りの村",
-        profile: "薪と食糧を分ける炉の寄合。炉を守る人なら、名がなくても発言できる。",
+        profile: "戦後、帰る場所を失った人々が共同炉を囲んで築いた村。炉を守る者なら誰でも寄合で発言できる。",
         terrain: Landscape::Meadow,
         entry: (158, 174),
         places: [
-            Place { name: "共同炉", at: (154, 98), art: Some(Art::Hearth), ground: Landscape::Yard, detail: "避難民が最初の家を建てた場所。薪当番が火を守る。" },
-            Place { name: "ガウェイン旧宅", at: (91, 106), art: Some(Art::Cottage), ground: Landscape::Yard, detail: "アレンが父と暮らした家。隣人は雪の日のことを覚えている。" },
-            Place { name: "冬越し小屋", at: (146, 38), art: Some(Art::Inn), ground: Landscape::Yard, detail: "身元を明かさずに休める小屋。斜面を登る薪道が通じる。" },
-            Place { name: "薪割り場", at: (222, 80), art: Some(Art::Cottage), ground: Landscape::Wood, detail: "東の林縁に冬の薪を集めている。" },
-            Place { name: "寄合小屋", at: (173, 104), art: Some(Art::Cottage), ground: Landscape::Square, detail: "炉を使う世帯の寄合。今夜は避難民名簿を議論する。" },
-            Place { name: "薪道の雪隠れ", at: (207, 40), art: None, ground: Landscape::Wood, detail: "雪の上に小さな足跡が続く。" },
-            Place { name: "旧宅の繕い台", at: (75, 101), art: None, ground: Landscape::Yard, detail: "壁に古い手袋の型紙が留めてある。" },
-            Place { name: "炉の炊事場", at: (132, 111), art: Some(Art::Stalls), ground: Landscape::Yard, detail: "昔使われた大鍋に、焦げた香草がこびりついている。" },
+            Place { name: "共同炉", at: (154, 98), art: Some(Art::Hearth), ground: Landscape::Yard, detail: "村の中心にある大きな炉。薪当番が昼夜火を守っている。" },
+            Place { name: "ガウェイン旧宅", at: (91, 106), art: Some(Art::Cottage), ground: Landscape::Yard, detail: "アレンが父と暮らした家。隣人は昔の雪の日をよく覚えている。" },
+            Place { name: "冬越し小屋", at: (146, 38), art: Some(Art::Inn), ground: Landscape::Yard, detail: "事情を問わず身を寄せられる小屋。裏の斜面から薪道が続く。" },
+            Place { name: "薪割り場", at: (222, 80), art: Some(Art::Cottage), ground: Landscape::Wood, detail: "東の林のはずれに、冬を越すための薪が積まれている。" },
+            Place { name: "寄合小屋", at: (173, 104), art: Some(Art::Cottage), ground: Landscape::Square, detail: "村の暮らしを話し合う小屋。今夜は避難民の名簿が議題だ。" },
+            Place { name: "薪道の雪隠れ", at: (207, 40), art: None, ground: Landscape::Wood, detail: "雪の上に、小さな足跡が点々と続いている。" },
+            Place { name: "旧宅の繕い台", at: (75, 101), art: None, ground: Landscape::Yard, detail: "壁に、子ども用の古い手袋の型紙が留められている。" },
+            Place { name: "炉の炊事場", at: (132, 111), art: Some(Art::Stalls), ground: Landscape::Yard, detail: "昔使われていた大鍋に、焦げた香草の跡が残っている。" },
         ],
         stories: [
             Story {
                 title: "炉の名札",
                 beats: &[
-                    Beat::speech(0, "炉番", Hearth, "警備隊が避難してきた人の名簿を出せって言ってる。冬越し小屋の夜番に、どこまで話していいか聞いてきておくれ。"),
-                    Beat::speech(2, "夜番", Worker, "名札のない薪束にも、私の刻み目があるでしょう。夜番をしてることなら話していいよ。"),
-                    Beat::speech(4, "寄合の世話役", Villager, "薪札は預かるよ。配給帳に名前を書いてもいいって、ご本人から聞いた。警備隊には薪札だけ渡すか、配給係にも名前を届けるか、どうしようか。"),
+                    Beat::speech(0, "炉番", Hearth, "警備隊が避難してきた人の名簿を出せって言ってるんだ。冬越し小屋の夜番に、名前を出していいか聞いてきておくれ。"),
+                    Beat::speech(2, "夜番", Worker, "私の薪束には刻み目があるから、働いている証はそれで十分だよ。名前を伏せたまま夜番を続けるか、思い切って名簿に載せるか迷ってるんだ。"),
+                    Beat::speech(4, "寄合の世話役", Villager, "夜番の気持ちは聞いたよ。警備隊には働きを示す薪札だけ渡すか、本人の名前も配給帳に載せて堂々と暮らせるようにするか、どうしようか。"),
                 ],
                 choices: Some([
-                    Ending { label: "薪札だけ出す", text: "警備隊には薪札だけを渡した。夜番は名を伏せたまま当番を続け、共同炉にも席をもらった。" },
-                    Ending { label: "本人の名も届ける", text: "夜番の名が配給帳に加わった。次の当番の日、夜番は自分から共同炉のそばに座った。" },
+                    Ending { label: "薪札だけ渡す", text: "警備隊には薪札だけを渡した。夜番は名を伏せたまま当番を続け、共同炉にも席を用意してもらえた。" },
+                    Ending { label: "名前も名簿に載せる", text: "夜番の名前が配給帳に加わった。次の当番の日、夜番は胸を張って共同炉のそばに座った。" },
                 ]),
             },
             Story {
                 title: "父の手袋",
                 beats: &[
-                    Beat::speech(1, "旧宅の隣人", Villager, "ほら、あんたのお父さんの手袋だよ。もう片方は、うちの繕い台に置いてなかったかね。"),
-                    Beat::speech(6, "旧宅の隣人", Villager, "縫い目に『あれん』ってあるだろ。雪遊びに行く前に、お父さんがあんたの手に合わせて縫い縮めたんだよ。"),
-                    Beat::scene(1, "アレンは手袋に指を入れてみた。すぐにつかえた。雪の中で父の手を握っていた頃には、これでちょうどよかった。"),
+                    Beat::speech(1, "旧宅の隣人", Villager, "ほら、お父さんの古い手袋だよ。もう片方は、家の脇の繕い台に置き忘れたままだったかね。探してきておくれ。"),
+                    Beat::scene(6, "繕い台の上に片方の手袋があった。手のひらに合わせて縫い縮められ、裏に『あれん』と縫いつけてある。"),
+                    Beat::scene(1, "アレンが指を入れてみると、すぐにつかえた。雪の中で父と手をつないでいた頃には、これでちょうどよかったのだ。"),
                 ],
                 choices: None,
             },
             Story {
                 title: "煙を追う",
                 beats: &[
-                    Beat::speech(2, "小屋の世話役", Villager, "床の隙間から煙が上がってきたんだ。寝てた人はみんな外に出したけど、この寒さじゃ長くもたないよ。"),
-                    Beat::speech(3, "薪割り場の職人", Worker, "ほら、風が吹くと煙突の曲がった管が揺れるだろ。継ぎ目が割れて、煙が床下にまわってる。"),
-                    Beat::speech(2, "小屋の世話役", Villager, "風が弱まったね。管を直すあいだ、小屋の人たちはどこで暖を取ろうか。"),
+                    Beat::speech(2, "小屋の世話役", Villager, "炉の煙が床下に漏れて、寝ていた人をみんな外に出したんだ。でも、この寒さじゃ長く外にはいられない。"),
+                    Beat::speech(3, "薪割り場の職人", Worker, "風が吹くと煙突の曲がった管が揺れて、継ぎ目が割れるんだ。風が収まった今なら直せるよ。"),
+                    Beat::speech(2, "小屋の世話役", Villager, "職人がすぐ来てくれるそうだ。修理のあいだ炉を止めて待つか、みんなを薪割り場の焚き火へ移すか、どっちがいいだろう？"),
                 ],
                 choices: Some([
-                    Ending { label: "炉を止めて管を直す", text: "夜明けには煙が煙突からまっすぐ上がった。外へ出ていた人たちも、寝床に戻れた。" },
-                    Ending { label: "薪割り場へ炉を移す", text: "小屋の人々は林縁で温まった。職人は翌日の明るい時間に管を直す。" },
+                    Ending { label: "炉を止めて管を直す", text: "夜明け前には修理が終わり、煙がまっすぐ空へ上がった。外で待っていた人たちも暖かい寝床に戻れた。" },
+                    Ending { label: "薪割り場へ人を移す", text: "小屋の人々は林の焚き火で夜をしのいだ。職人は翌日の明るい時間にゆっくり煙突を直した。" },
                 ]),
             },
             Story {
                 title: "薪山の番人",
                 beats: &[
-                    Beat::speech(3, "薪割り場の職人", Worker, "薪が毎晩ひと束ずつ減るんだ。獣は薪なんか持っていかないだろうし、誰が使ってるんだろうね。"),
-                    Beat::scene(5, "雪の窪みで、子どもが倒れていた旅人の手を温めている。火にくべていたのは薪割り場の薪だった。日が暮れる前なら、小屋へ運べそうだ。"),
-                    Beat::scene(2, "小屋の空き寝台で旅人が目を覚ました。掛けられた毛布を見て、貸してくれた子はどこかと辺りを見回した。"),
+                    Beat::speech(3, "薪割り場の職人", Worker, "毎晩、薪がひと束ずつ減るんだ。獣が運ぶわけもないし、誰が持っていくんだろうね。"),
+                    Beat::scene(5, "雪の窪みで、子どもが倒れた旅人の手を温めていた。燃やしていたのは薪割り場の薪だ。日が暮れる前なら小屋へ運べそうだ。"),
+                    Beat::scene(2, "冬越し小屋の寝台で旅人が目を覚ました。掛けられた毛布を見て、助けてくれた子どもはどこかと辺りを見回した。"),
                 ],
                 choices: None,
             },
             Story {
                 title: "灰の中の晩餐",
                 beats: &[
-                    Beat::speech(7, "炊事番", Worker, "先代の鍋でみんなに振る舞いたいんだ。焦げ跡は残ってるけど、何の香草を入れてたのか分からなくてね。"),
-                    Beat::speech(6, "旧宅の隣人", Villager, "私が覚えてるのは苦い香草だよ。冬越し小屋の古参は甘い根だと言うけど、昔は鍋が二つあったからね。"),
-                    Beat::speech(7, "炊事番", Worker, "昔は二鍋あったのか。今夜使えるのはこの鍋ひとつだ。どっちを作ろうか。"),
+                    Beat::speech(7, "炊事番", Worker, "昔の大鍋で温かい汁を振る舞いたいんだ。でも、何を入れて煮込んでいたのか誰に聞いても違うことを言うんだよ。"),
+                    Beat::speech(6, "旧宅の隣人", Villager, "私が覚えてるのは苦い香草の汁だよ。でも冬越し小屋の年寄りは甘い根菜だと言うし……昔は鍋が二つあったからねえ。"),
+                    Beat::speech(7, "炊事番", Worker, "なるほど、鍋が二つあったのか。今夜使えるのはこのひとつだけだ。どっちの味を作ろうか？"),
                 ],
                 choices: Some([
-                    Ending { label: "苦い香草の鍋", text: "古参の薪番が集まり、戦後に初めて根菜を分けた夜の話をした。" },
-                    Ending { label: "甘い根の鍋", text: "子どもたちが皿を持って集まり、明日の炊事当番に手を挙げる。" },
+                    Ending { label: "苦い香草の汁", text: "年配の炉番たちが集まり、戦後に初めてみんなで鍋を囲んだ夜の思い出を語り合った。" },
+                    Ending { label: "甘い根菜の汁", text: "子どもたちが皿を持って集まり、お代わりをしながら明日の炊事手伝いに手を挙げた。" },
                 ]),
             },
         ],
     },
     Plan {
         name: "霧灯の港町",
-        profile: "船頭と灯台守が入港料と当番を預かる。救難では灯台守が順を変えられる。",
+        profile: "石灯台が霧の入江を守る港町。普段の入港順は船頭が決めるが、遭難のときは灯台守が優先を決める。",
         terrain: Landscape::Coast,
         entry: (147, 67),
         places: [
-            Place { name: "石灯台と油蔵", at: (186, 147), art: Some(Art::Lighthouse), ground: Landscape::Shore, detail: "石灯台が霧の入江を照らす。油蔵の棚はほとんど空だ。" },
-            Place { name: "荷揚げ桟橋", at: (143, 142), art: None, ground: Landscape::Dock, detail: "交易船が荷を下ろす。杭には潮の高さが刻まれている。" },
-            Place { name: "救難艇庫", at: (83, 122), art: Some(Art::Cottage), ground: Landscape::Dock, detail: "救難艇がいつでも出せるよう櫂を並べている。" },
-            Place { name: "崖上信号台", at: (254, 92), art: Some(Art::Palisade), ground: Landscape::Heath, detail: "東の崖から沖と入江を見渡せる。" },
-            Place { name: "干潮の舟揚げ場", at: (115, 149), art: None, ground: Landscape::Shore, detail: "海が引いた跡に古い舟を曳いた筋が見える。" },
-            Place { name: "霧笛の反響壁", at: (231, 112), art: None, ground: Landscape::Heath, detail: "崖に沿った石壁が霧笛を町へ返す。" },
-            Place { name: "潮だまり", at: (76, 145), art: None, ground: Landscape::Shore, detail: "捨て網の下で小さな波紋が動いている。" },
-            Place { name: "南の通船桟橋", at: (145, 165), art: None, ground: Landscape::Dock, detail: "島の外へ向かう船がここから出る。" },
+            Place { name: "石灯台と油蔵", at: (186, 147), art: Some(Art::Lighthouse), ground: Landscape::Shore, detail: "霧の入江を照らす石の灯台。油蔵の棚はほとんど空になっている。" },
+            Place { name: "荷揚げ桟橋", at: (143, 142), art: None, ground: Landscape::Dock, detail: "交易船が荷を下ろす桟橋。杭には満ち引きの目盛りが刻まれている。" },
+            Place { name: "救難艇庫", at: (83, 122), art: Some(Art::Cottage), ground: Landscape::Dock, detail: "いつでも救助に出られるよう、小舟と櫂が並べてある。" },
+            Place { name: "崖上信号台", at: (254, 92), art: Some(Art::Palisade), ground: Landscape::Heath, detail: "東の崖の上から、沖と入江のすべてを見渡せる。" },
+            Place { name: "干潮の舟揚げ場", at: (115, 149), art: None, ground: Landscape::Shore, detail: "潮が引いた浜に、古い舟を引き上げた跡が残っている。" },
+            Place { name: "霧笛の反響壁", at: (231, 112), art: None, ground: Landscape::Heath, detail: "崖に沿った石壁が、霧笛の音を町の方へ跳ね返している。" },
+            Place { name: "潮だまり", at: (76, 145), art: None, ground: Landscape::Shore, detail: "打ち上げられた古い網の下で、小さな水しぶきが上がっている。" },
+            Place { name: "南の通船桟橋", at: (145, 165), art: None, ground: Landscape::Dock, detail: "島の外へ向かう連絡船がここから出航する。" },
         ],
         stories: [
             Story {
                 title: "最後の一缶",
                 beats: &[
-                    Beat::speech(0, "灯台守", Lightkeeper, "油があと一缶しかない。貨物船のために灯をともすと、救難艇に回すぶんが残らん。信号台から沖の様子を見てきてくれ。"),
-                    Beat::scene(3, "沖に貨物船が二隻いる。入江の中にはもう霧が入り始めていた。信号旗が見えるうちなら、手前の船に油を頼めそうだ。"),
+                    Beat::speech(0, "灯台守", Lightkeeper, "灯油があと一缶しかない。貨物船のために朝まで照らすと、救難艇に回すぶんがなくなる。信号台から沖の様子を見てきてくれ。"),
+                    Beat::scene(3, "沖に貨物船が二隻いる。入江の中にはもう霧が入り始めていた。信号旗が見えるうちなら、手前の船に油を分けてもらえそうだ。"),
                     Beat::speech(0, "灯台守", Lightkeeper, "旗を振れば、あの船にはまだ届くか。油を借りるか、いまあるぶんで夜明けまで持たせるか……どう思う？"),
                 ],
                 choices: Some([
@@ -105,25 +105,25 @@ pub(super) static NOX: [Plan; 10] = [
             Story {
                 title: "折り返さない舟",
                 beats: &[
-                    Beat::speech(2, "艇庫の船頭", Worker, "昔、帳面に載ってない小舟を、あの浜に曳き上げたことがある。入り江の低いところに、舵が残ってるかもしれんな。"),
-                    Beat::speech(4, "網を繕う漁師", Worker, "その舵なら覚えてるよ。船名が彫ってあるだろ。乗ってた人なら、浜から自分の足で丘を越えていったよ。"),
-                    Beat::scene(1, "家族は舵の船名をなぞった。海で亡くなったと思っていた人が、浜から丘へ歩いていった。その話を聞くと、家族は丘へ続く道を見上げた。"),
+                    Beat::speech(2, "艇庫の船頭", Worker, "昔、記録にない小舟をあの浜に引き上げたことがあるんだ。乗っていた人の家族が今も探しているらしい。浜に舵が残ってるかもしれん。"),
+                    Beat::speech(4, "網を繕う漁師", Worker, "その舵なら覚えてるよ。船の名前が彫ってあるだろ。乗っていた人は無事浜に上がって、自分の足で丘を越えていったよ。"),
+                    Beat::scene(1, "桟橋で待つ家族に舵の船名を見せた。海で亡くなったと思っていた人が丘を越えていったと聞き、家族は涙を拭って丘への道を見上げた。"),
                 ],
                 choices: None,
             },
             Story {
                 title: "霧笛の届く家",
                 beats: &[
-                    Beat::speech(0, "灯台守", Lightkeeper, "霧笛を鳴らすたび、崖のそばの三軒から苦情が来る。沖の船に聞こえなくなるのも困るんだがね。"),
-                    Beat::scene(5, "霧笛が鳴ると、石壁の端で跳ね返った音が家並みのほうへ飛んだ。崖の上では、沖から返る音のほうが先に聞こえた。"),
-                    Beat::scene(0, "霧笛の向きはそのままに、石壁に木の覆いを掛けた。港の鐘が鳴っても、今度は家の戸がばたばたと閉まることはなかった。"),
+                    Beat::speech(0, "灯台守", Lightkeeper, "霧笛を鳴らすたび、崖の下の家からうるさいと苦情が来るんだ。でも音を弱めると、沖の船に届かなくなっちまう。"),
+                    Beat::scene(5, "霧笛が鳴ると、崖の石壁に当たった音が町の家々へ真っすぐ跳ね返っていた。石壁に覆いを掛ければ、町への反響だけを抑えられそうだ。"),
+                    Beat::scene(0, "石壁に厚い木の覆いを掛けた。次に霧笛を鳴らしても、沖へはよく届くのに、崖下の家の窓が震えることはなくなった。"),
                 ],
                 choices: None,
             },
             Story {
                 title: "潮だまりの客",
                 beats: &[
-                    Beat::voice(2, "艇庫の子", "ねえ、あの潮だまり。網の下で何か動いたよ。見てくれる？"),
+                    Beat::voice(2, "艇庫の子", "ねえ、あの潮だまり！　古い網の下で何か動いてるよ。見に行ってくれる？"),
                     Beat::scene(6, "捨て網の下で、海獣の仔が藻を押しのけようとしていた。網を外し、海へ続く細い水路まで桶で海水を足した。"),
                     Beat::scene(2, "仔は水路を抜けて沖へ泳いでいった。艇庫の子は浜を見渡し、残っていた古い網を束ね始めた。"),
                 ],
@@ -132,9 +132,9 @@ pub(super) static NOX: [Plan; 10] = [
             Story {
                 title: "まだ借りられる桟橋",
                 beats: &[
-                    Beat::speech(1, "桟橋の係", Worker, "見送りの船に桟橋を貸したいんだが、ちょうど同じ刻に商船が着く。小舟をつなげるところが、ほかにないかね。"),
-                    Beat::scene(7, "通船用の杭なら小舟をつなげる。ただし船を留められるのは一艘だけだ。見送りの船か、商船から荷を移した小舟なら使える。"),
-                    Beat::speech(1, "桟橋の係", Worker, "浜で両方とも返事を待ってる。通船の杭は、どっちに使ってもらおうか。"),
+                    Beat::speech(1, "桟橋の係", Worker, "亡くなった人を送り出す家族の船に桟橋を貸したいんだが、同じ時刻に大きな商船が着く。どちらかを別の場所へ回せないかな。"),
+                    Beat::scene(7, "南の通船桟橋なら小舟を一艘だけ着けられる。家族の船をこちらへ移すか、商船の荷を小舟に積み替えて運ぶかできそうだ。"),
+                    Beat::speech(1, "桟橋の係", Worker, "浜で両方が返事を待ってる。静かに見送れる外桟橋へ家族の船を移すか、荷を小舟で運んでもらうか、どっちがいい？"),
                 ],
                 choices: Some([
                     Ending { label: "家族の船を外桟橋へ", text: "風の当たらない外桟橋で家族は船を見送った。商船はいつもの岸壁で荷を下ろした。" },
@@ -145,46 +145,46 @@ pub(super) static NOX: [Plan; 10] = [
     },
     Plan {
         name: "西風の砦町",
-        profile: "砦長が夜の門を、商人組合が昼の市を預かる。通行料は両方の承認が必要だ。",
+        profile: "荒野の旅人が集まる砦町。砦長が夜の警備を、商人組合が昼の市と護送団を取り仕切る。",
         terrain: Landscape::Heath,
         entry: (27, 111),
         places: [
-            Place { name: "木柵門", at: (64, 102), art: Some(Art::Palisade), ground: Landscape::Heath, detail: "荒野から来る荷馬をここで調べる。" },
-            Place { name: "護送受付と市", at: (153, 100), art: Some(Art::Stalls), ground: Landscape::Square, detail: "護送団の出発と、次の峠を渡る荷を募っている。" },
-            Place { name: "観測櫓", at: (162, 34), art: Some(Art::Palisade), ground: Landscape::Heath, detail: "峠の崩れと西の旧荷道が見通せる。" },
-            Place { name: "荷馬避難柵", at: (166, 155), art: Some(Art::Cottage), ground: Landscape::Pasture, detail: "門の外で体を休める荷馬の場所。" },
-            Place { name: "旧荷道の曲がり角", at: (77, 59), art: None, ground: Landscape::Heath, detail: "風化した目印が放牧地の方を向いている。" },
-            Place { name: "見張り鐘", at: (197, 49), art: Some(Art::Clock), ground: Landscape::Heath, detail: "背後にひび割れた岩壁がある。" },
-            Place { name: "護送団の荷改め場", at: (237, 108), art: Some(Art::Inn), ground: Landscape::Yard, detail: "戻った荷と支払控えを記録する。" },
-            Place { name: "矢羽の工房", at: (125, 117), art: Some(Art::Cottage), ground: Landscape::Yard, detail: "引退する弓兵が羽根を選り分けている。" },
+            Place { name: "木柵門", at: (64, 102), art: Some(Art::Palisade), ground: Landscape::Heath, detail: "荒野から来る荷馬車をここで調べる。" },
+            Place { name: "護送受付と市", at: (153, 100), art: Some(Art::Stalls), ground: Landscape::Square, detail: "護送団の出発を待ち、峠を越える荷を募っている。" },
+            Place { name: "観測櫓", at: (162, 34), art: Some(Art::Palisade), ground: Landscape::Heath, detail: "峠の崩れた場所と、西の古い荷道が見通せる。" },
+            Place { name: "荷馬避難柵", at: (166, 155), art: Some(Art::Cottage), ground: Landscape::Pasture, detail: "門の外で疲れた馬が体を休める場所。" },
+            Place { name: "旧荷道の曲がり角", at: (77, 59), art: None, ground: Landscape::Heath, detail: "古びた道しるべが放牧地の方を向いている。" },
+            Place { name: "見張り鐘", at: (197, 49), art: Some(Art::Clock), ground: Landscape::Heath, detail: "背後に大きくひび割れた岩壁がある。" },
+            Place { name: "護送団の荷改め場", at: (237, 108), art: Some(Art::Inn), ground: Landscape::Yard, detail: "運ばれた荷と支払いの控えを記録する場所。" },
+            Place { name: "矢羽の工房", at: (125, 117), art: Some(Art::Cottage), ground: Landscape::Yard, detail: "引退を控えた弓兵が、矢の羽根を選り分けている。" },
         ],
         stories: [
             Story {
                 title: "二枚の地図",
                 beats: &[
-                    Beat::speech(1, "市の商人", Worker, "護送代がこれ以上上がると、うちは店を畳むしかない。櫓に行けば、峠の脇に別の道が見えるはずだ。"),
-                    Beat::scene(2, "峠の迂回路は放牧地の柵を横切る。櫓から見ると、旧荷道は放牧地を大きく外れ、昼なら先まで見渡せる。"),
-                    Beat::speech(1, "商人組合の世話役", Worker, "昼だけ旧荷道を使わせてもらうか、何軒かで護送代を出し合うか。砦長に話を持っていくなら、どっちがいい？"),
+                    Beat::speech(1, "市の商人", Worker, "護送料がこれ以上上がると、うちは店を畳むしかない。櫓に登れば、峠の脇を通れる別の道が見えるはずだ。"),
+                    Beat::scene(2, "峠の迂回路は放牧地の柵を横切るが、古い荷道なら放牧地を外れて昼間は見通しもよい。"),
+                    Beat::speech(1, "商人組合の世話役", Worker, "昼だけ古い荷道を使わせてもらうか、何軒かで荷車をまとめて護送料を分け合うか。砦長に頼むならどっちがいいだろう？"),
                 ],
                 choices: Some([
-                    Ending { label: "旧荷道を昼だけ開く", text: "巡回が昼の旧荷道に移り、柵沿いの抜け道が開いた。" },
-                    Ending { label: "護送料を共同払いにする", text: "店を何軒かまとめて荷車を一台にし、護送代を分け合った。旧荷道の柵は開けずに済んだ。" },
+                    Ending { label: "旧荷道を昼だけ開く", text: "見回りが昼の旧荷道に移り、安全に荷を運べる抜け道が開いた。" },
+                    Ending { label: "護送料を共同払いにする", text: "何軒かの荷を一台の荷車にまとめ、護送料を分け合った。古い柵は開けずに済んだ。" },
                 ]),
             },
             Story {
                 title: "鐘が二度鳴る",
                 beats: &[
-                    Beat::speech(5, "見張りの番兵", Guard, "鐘は一度しか打ってない。なのに北の荒野じゃ二度聞こえたらしい。荷運びが驚いて街道から逃げたんだ。"),
+                    Beat::speech(5, "見張りの番兵", Guard, "鐘は一度しか打っていないのに、北の荒野では二度聞こえたらしい。魔獣の警報だと思って荷運び人が逃げちまったんだ。"),
                     Beat::scene(4, "曲がり角で岩に向かって呼ぶと、鐘の方角から声が少し遅れて返ってきた。その声を聞いて、岩陰から荷運び人が顔を出した。"),
-                    Beat::scene(5, "番兵は音の返る場所を札に描き、鐘の下に掛けた。荷運び人はそれを見てから、ほどけた荷縄を結び直した。"),
+                    Beat::scene(5, "番兵は音が跳ね返る場所を案内札に描き、鐘の下に掛けた。荷運び人は納得して、ほどけた荷縄を結び直した。"),
                 ],
                 choices: None,
             },
             Story {
                 title: "柵の内側で育つ",
                 beats: &[
-                    Beat::speech(0, "門番", Guard, "その仔馬、ずっと震えてるな。病気かもしれん。先に避難柵で診てもらってくれ。"),
-                    Beat::speech(3, "馬の世話役", Worker, "母馬のそばに寄せたら、震えが止まったね。この仔は長旅で冷えただけみたいだよ。"),
+                    Beat::speech(0, "門番", Guard, "その仔馬、ずっと震えてるな。流行り病かもしれん。先に避難柵で診てもらってくれ。"),
+                    Beat::speech(3, "馬の世話役", Worker, "母馬のそばに寄せたら、すぐ震えが止まったよ。病気じゃなくて、長旅で冷えただけみたいだね。"),
                     Beat::scene(0, "門番は馬を一晩休ませる札を書いた。柵の奥に母馬と仔馬の水桶が並び、乾いた藁が敷かれた。"),
                 ],
                 choices: None,
@@ -192,21 +192,21 @@ pub(super) static NOX: [Plan; 10] = [
             Story {
                 title: "帳面を持った賊",
                 beats: &[
-                    Beat::speech(6, "荷改めの番兵", Guard, "取り返した荷に、市の印がないんだ。荷主も襲った連中も、前に運んだぶんの代金がまだだと言ってる。"),
-                    Beat::speech(1, "市の帳付け", Worker, "この支払控えを見てくれ。荷主は代理人を通してる。襲った連中は、その代理人からずっと金をもらえずにいたらしい。"),
-                    Beat::speech(6, "荷改めの番兵", Guard, "荷はここで返せる。未払いの話は審理に回すか、荷を返すところで両方に支払い方を決めてもらうか。どうする？"),
+                    Beat::speech(6, "荷改めの番兵", Guard, "盗賊から取り返した荷に、市の印がないんだ。襲った連中は『前の運賃を踏み倒されたから取り立てた』と言い張っていてね。"),
+                    Beat::speech(1, "市の帳付け", Worker, "控えを調べたら、荷主は代理人に金を払っていたのに、代理人が運び手に賃金を渡していなかったらしい。"),
+                    Beat::speech(6, "荷改めの番兵", Guard, "荷はここで荷主に返せる。代理人の不正を広場で裁くか、市の立会いで分割払いの約束を結ばせるか、どうしよう？"),
                 ],
                 choices: Some([
-                    Ending { label: "公開審理に回す", text: "公開の審理に代理人も呼ばれた。ほかの運び手も、払われていない代金について申し立てられるようになった。" },
-                    Ending { label: "返還と分割払いを結ぶ", text: "荷はすぐ持ち主へ戻り、運び手は市役の立会いで最初の支払いを受けた。" },
+                    Ending { label: "公開審理に回す", text: "広場の審理に代理人も呼ばれた。ほかの運び手も、未払いの代金をまとめて申し立てられるようになった。" },
+                    Ending { label: "返還と分割払いを結ぶ", text: "荷はすぐ持ち主へ戻り、運び手は市役の立会いで最初の支払いを受け取った。" },
                 ]),
             },
             Story {
                 title: "最後の矢羽",
                 beats: &[
-                    Beat::speech(7, "老弓兵", Guard, "引退する前に、あの若い門兵と一度だけ射ち比べたいんだ。狙いの付け方と風を読む立ち位置、どっちを先に教えようかね。"),
+                    Beat::speech(7, "老弓兵", Guard, "引退する前に、あの若い門兵に腕を伝えたいんだ。的を正確に射る技と、荒野の風を読むコツ、どっちから教えようかね。"),
                     Beat::scene(2, "櫓から見ると、柵の内と外で旗が別の向きにはためいている。足元では若い門兵が、自分の矢を一本ずつ並べていた。"),
-                    Beat::speech(7, "老弓兵", Guard, "よし、始めよう。あいつに先に見せるのは、的を狙うところか、それとも風上に立つところか。"),
+                    Beat::speech(7, "老弓兵", Guard, "よし、始めよう。あいつに先に見せるのは、的を狙う手本か、それとも風を読む立ち位置か、どっちがいい？"),
                 ],
                 choices: Some([
                     Ending { label: "柵内の的を射る", text: "若い門兵は、矢羽と弦を同じ角度に揃える手つきを教わった。" },
@@ -217,28 +217,28 @@ pub(super) static NOX: [Plan; 10] = [
     },
     Plan {
         name: "葦渡りの村",
-        profile: "水路ごとの当番が板道を守る。水門は葦刈り手と漁師の立会いで開閉する。",
+        profile: "湿地に板道を渡して暮らす村。水門の開閉は、葦を刈る人と漁師の双方が立ち会って決める。",
         terrain: Landscape::Marsh,
         entry: (61, 110),
         places: [
             Place { name: "杭上の寄合所", at: (152, 98), art: Some(Art::Inn), ground: Landscape::Dock, detail: "高床の部屋を板道がつなぐ。戸口に水路の割当表がある。" },
-            Place { name: "西の渡し桟橋", at: (91, 98), art: None, ground: Landscape::Dock, detail: "底の浅い舟が板道の切れ目をつなぐ。" },
-            Place { name: "北の水門", at: (138, 34), art: Some(Art::Sluice), ground: Landscape::Dock, detail: "上流の目盛りには浚渫前の基準が残っている。" },
-            Place { name: "産卵棚", at: (191, 153), art: None, ground: Landscape::Dock, detail: "下流で魚の卵を数える棚。脇の杭に潮位板がある。" },
-            Place { name: "古い舟大工の小屋", at: (68, 60), art: Some(Art::Cottage), ground: Landscape::Dock, detail: "舟大工は川筋が変わる前を知っている。" },
-            Place { name: "花の杭", at: (165, 118), art: None, ground: Landscape::Dock, detail: "板の下へ向けて花が供えられている。" },
-            Place { name: "葦籠の作業場", at: (214, 77), art: Some(Art::Stalls), ground: Landscape::Yard, detail: "風を通す高台で籠を編んでいる。" },
-            Place { name: "舟で入る浅瀬", at: (169, 145), art: None, ground: Landscape::Dock, detail: "板道からは仔獣の鳴き声だけが聞こえる。" },
+            Place { name: "西の渡し桟橋", at: (91, 98), art: None, ground: Landscape::Dock, detail: "底の浅い舟が、板道の途切れた場所をつないでいる。" },
+            Place { name: "北の水門", at: (138, 34), art: Some(Art::Sluice), ground: Landscape::Dock, detail: "上流の目盛りには、川をさらう前の基準が残っている。" },
+            Place { name: "産卵棚", at: (191, 153), art: None, ground: Landscape::Dock, detail: "下流で魚の卵を数える棚。脇の杭に水位板がある。" },
+            Place { name: "古い舟大工の小屋", at: (68, 60), art: Some(Art::Cottage), ground: Landscape::Dock, detail: "舟大工は、川の流れが変わる前の姿を知っている。" },
+            Place { name: "花の杭", at: (165, 118), art: None, ground: Landscape::Dock, detail: "板の下の水面へ向けて、花が供えられている。" },
+            Place { name: "葦籠の作業場", at: (214, 77), art: Some(Art::Stalls), ground: Landscape::Yard, detail: "風通しのよい高台で、葦の籠を編んでいる。" },
+            Place { name: "舟で入る浅瀬", at: (169, 145), art: None, ground: Landscape::Dock, detail: "板道からは、小さな鳴き声だけが聞こえてくる。" },
         ],
         stories: [
             Story {
                 title: "二つの水位",
                 beats: &[
-                    Beat::speech(0, "水路の当番", Villager, "上と下で水位の話が食い違ってるんだ。水を下げたい家も魚を守りたい家も、相手が勝手に水門をいじったと思ってる。"),
-                    Beat::scene(2, "水門の目盛りには、門を閉めたときの高さが刻んである。それに合わせて見ると、上流だけが普段より高い。"),
-                    Beat::speech(3, "下流の漁師", Worker, "ここの水まで下げたら、産卵棚が干上がるよ。ほら、泥の筋が脇の水路に続いてる。流れがそっちへ抜けたんだ。"),
-                    Beat::speech(4, "舟大工", Worker, "昔はこう流れてたんだ。浚ったときの土で、この枝水路が塞がってる。そこを掘り直せば、魚棚の水を残したまま葦を刈れるよ。"),
-                    Beat::scene(0, "葦刈りの水路だけ水を落とすと、魚棚には水が残った。当番は川沿いの板をつなぎ、向こう岸まで歩けるようにした。"),
+                    Beat::speech(0, "水路の当番", Villager, "上流と下流で水位の話が噛み合わないんだ。水を下げたい葦刈り組と、魚を守りたい漁師が、相手が勝手に水門をいじったと疑ってる。"),
+                    Beat::scene(2, "水門の目盛りを見ると、上流だけ普段より水が高い。門の隙間ではなく、脇へ抜ける古い水路に原因がありそうだ。"),
+                    Beat::speech(3, "下流の漁師", Worker, "本流の水まで落とされたら、産卵棚が干上がっちまう。ほら、泥が流れ込んで脇の水路が詰まってるのが見えるだろ？"),
+                    Beat::speech(4, "舟大工", Worker, "昔はあの枝水路へ水を逃がしてたんだ。詰まった土を掘り直せば、魚棚の水を残したまま、上流の葦刈り場だけ水を落とせるよ。"),
+                    Beat::scene(0, "枝水路の土をさらうと、魚棚の水を保ったまま葦刈り場の水位が下がった。当番は両岸の板道をつなぎ、行き来できるようにした。"),
                 ],
                 choices: None,
             },
@@ -288,7 +288,7 @@ pub(super) static NOX: [Plan; 10] = [
     },
     Plan {
         name: "オオ麦の里",
-        profile: "耕作者が種蔵番を選ぶ。砦へ出す麦の量は里と辺境領が取り決める。",
+        profile: "見渡す限りの麦畑が広がる里。不作の年に種を貸し合う共同種蔵がある。",
         terrain: Landscape::Farm,
         entry: (276, 103),
         places: [
@@ -305,9 +305,9 @@ pub(super) static NOX: [Plan; 10] = [
             Story {
                 title: "種蔵の秤",
                 beats: &[
-                    Beat::speech(3, "秤場の係", Worker, "砦へ出す麦を量ったら、注文より重いんだ。風車に積み荷の控えがあるから、確かめてきてくれないか。"),
-                    Beat::record(0, "風車の積み荷控え", "黄色い荷札の袋は来年まく種麦。砦への荷には入れず、共同種蔵に戻すこと。"),
-                    Beat::speech(1, "砦の補給係", Worker, "黄色の札が付いた二袋は倉へ戻した。砦へは古い粉を送るか、近くの里から麦を借りるか、どっちにしよう。"),
+                    Beat::speech(3, "秤場の係", Worker, "砦へ送る麦を量ったら、注文よりずっと重いんだ。風車に積み荷の控えがあるから、間違いがないか見てきてくれないか。"),
+                    Beat::record(0, "風車の積み荷控え", "『黄色い荷札の袋は来年まく種麦。砦への荷には混ぜず、必ず共同種蔵へ戻すこと』"),
+                    Beat::speech(1, "砦の補給係", Worker, "黄色い札の二袋は種蔵へ戻したよ。そのぶん砦への麦が足りないが、古い粉を代わりに送るか、隣の里から借りるか、どうしよう？"),
                 ],
                 choices: Some([
                     Ending { label: "古い粉を送る", text: "砦は保存菓子に使う粉として引き取った。里では、各戸に来年の種を借りるための札が配られた。" },
@@ -350,9 +350,9 @@ pub(super) static NOX: [Plan; 10] = [
             Story {
                 title: "畑の貸し手",
                 beats: &[
-                    Beat::speech(4, "借り畑の農家", Villager, "この秋から畑を借りたんだ。ところが、まく種を貸すのは畑の持ち主だけだって言われてね。"),
-                    Beat::speech(1, "種蔵番", Worker, "初めての畑で試すぶんの種は、少し余ってるよ。ただ、あの人が土をどう手入れしてるか、まだ見てないんだ。"),
-                    Beat::speech(4, "種蔵番", Worker, "畝はよく手入れされてるね。畑主に保証してもらって種を借りるか、共同の試験畑を一区画使うか。どちらなら続けられそうだい？"),
+                    Beat::speech(4, "借り畑の農家", Villager, "この秋から畑を借りたんだが、土地の持ち主でないと種蔵から種を借りられない決まりなんだ。どうにか種を分けてもらえないかな。"),
+                    Beat::speech(1, "種蔵番", Worker, "初めての畑で試すぶんの種なら少し余ってるよ。ただ、あの人が土をどう手入れしてるか、まだ見ていないんだ。"),
+                    Beat::speech(4, "種蔵番", Worker, "畝はよく手入れされてるね。畑主の保証で種を借りるか、共同の試験畑を一区画使うか。どちらなら続けられそうだい？"),
                 ],
                 choices: Some([
                     Ending { label: "畑主の保証で借りる", text: "借りた畑に春も種をまける。保証札には、借り手自身の名前も入った。" },
@@ -363,29 +363,29 @@ pub(super) static NOX: [Plan; 10] = [
     },
     Plan {
         name: "石継ぎの町",
-        profile: "石工会が建物と水路を検査する。井戸の水番は使う組が持ち回る。",
+        profile: "旧村の石材を運び出して築かれた石造りの町。石工会が建物と水路を守っている。",
         terrain: Landscape::Stone,
         entry: (276, 121),
         places: [
             Place { name: "アーチ井戸", at: (161, 96), art: Some(Art::Well), ground: Landscape::Square, detail: "煤けた旧村の敷石が、水場の敷居に組み込まれている。" },
             Place { name: "石工場と拓本台", at: (87, 90), art: Some(Art::Inn), ground: Landscape::Stone, detail: "出張鍛冶師のドワーフ、ブロムが石工の道具を直し、旅人の武具も打つ。" },
-            Place { name: "暗渠入口", at: (145, 32), art: Some(Art::Sluice), ground: Landscape::Stone, detail: "上から水が滴る。崩れた区画を避ける石目が残る。" },
+            Place { name: "暗渠入口", at: (145, 32), art: Some(Art::Sluice), ground: Landscape::Stone, detail: "上から水が滴る。崩れた場所を避ける目印が残る。" },
             Place { name: "転用石置場", at: (160, 153), art: None, ground: Landscape::Stone, detail: "敷石のそばに、石工が水路掃除で拾った沼鉄鉱が分けてある。" },
-            Place { name: "水番所", at: (172, 106), art: Some(Art::Cottage), ground: Landscape::Stone, detail: "水番が濁りと雨漏りの通報を受ける。" },
+            Place { name: "水番所", at: (172, 106), art: Some(Art::Cottage), ground: Landscape::Stone, detail: "水番が井戸の濁りや雨漏りの通報を受ける。" },
             Place { name: "段差のある家", at: (206, 77), art: Some(Art::Cottage), ground: Landscape::Stone, detail: "大きな敷石が元の家から使い継がれている。" },
             Place { name: "雨染みの裏路地", at: (199, 123), art: None, ground: Landscape::Stone, detail: "濡れているのは片方の壁だけだ。" },
-            Place { name: "拓本を待つ古い壁", at: (131, 137), art: None, ground: Landscape::Stone, detail: "壁の裏に、隣家が探す戸口印がのぞく。" },
+            Place { name: "拓本を待つ古い壁", at: (131, 137), art: None, ground: Landscape::Stone, detail: "壁の裏に、隣家が探す家の印がのぞいている。" },
         ],
         stories: [
             Story {
-                title: "井戸底の戸口印",
+                title: "井戸底の家印",
                 beats: &[
-                    Beat::speech(0, "井戸端の住民", Villager, "暗渠を閉める前に、敷石の戸口印を写してくれないか。煤けた旧村にあった、うちの敷石なんだ。"),
-                    Beat::scene(2, "石目の続くほうをたどると、崩れた床を避けて奥へ進めた。水の流れが緩いところに、二軒ぶんの戸口印が並んでいた。"),
-                    Beat::speech(1, "拓本師", Mason, "拓本の紙も、石を引き上げる綱も用意できる。もうすぐ暗渠を塞ぐよ。どっちを持っていく？"),
+                    Beat::speech(0, "井戸端の住民", Villager, "水が濁るからって地下の水路を塞ぐ前に、沈んだ旧村の敷石に残る家の印を写してくれないか。うちの先祖の石なんだ。"),
+                    Beat::scene(2, "石の目印をたどると、崩れた場所を避けて奥へ進めた。水の流れが緩やかな場所に、二軒ぶんの家の印が並んでいた。"),
+                    Beat::speech(1, "拓本師", Mason, "水路を塞ぐ時間が迫ってる。紙に印を写し取るか、重いけど綱で石ごと引き上げるか、どっちにしよう？"),
                 ],
                 choices: Some([
-                    Ending { label: "拓本を取り水路を塞ぐ", text: "水番は予定どおり井戸を使えるようにした。二軒の遺族は、写した戸口印を石置場に掲げた。" },
+                    Ending { label: "拓本を取り水路を塞ぐ", text: "水番は予定どおり井戸を使えるようにした。二軒の遺族は、写した家の印を石置場に掲げた。" },
                     Ending { label: "銘のある石を運び出す", text: "石は遺族の手に戻った。水番は今夜も井戸を止め、別の水を配った。" },
                 ]),
             },
@@ -413,9 +413,9 @@ pub(super) static NOX: [Plan; 10] = [
             Story {
                 title: "よその家の石",
                 beats: &[
-                    Beat::speech(1, "石工", Worker, "置場に戻した石の家印が、新しい家の壁から見えるんだ。どこから運んだ石か、確かめてくれないか。"),
-                    Beat::scene(7, "壁の石に付いた運搬札には、家印を下へ向けて置いたとある。石を買った家が、印を見ないまま受け取ったのも無理はない。"),
-                    Beat::scene(3, "転用石置場で両家が話した。印を刻んだ家族は、次の改築まで、その家を訪ねて印を見せてもらえることになった。"),
+                    Beat::speech(1, "石工", Worker, "置場から運んだ石に彫られた家の印が、別の人の新しい家の壁から見えてるんだ。どういう経緯か確かめてくれないか。"),
+                    Beat::scene(7, "壁の石に付いた運搬札には、家の印を下へ向けて積んだとある。石を買った家が、印に気づかないまま受け取ったのも無理はない。"),
+                    Beat::scene(3, "転用石置場で両家が話し合った。印を刻んだ家族は、次の改築まで、その家を訪ねて印を見せてもらえることになった。"),
                 ],
                 choices: None,
             },
@@ -432,15 +432,15 @@ pub(super) static NOX: [Plan; 10] = [
     },
     Plan {
         name: "遠火の宿場",
-        profile: "旅籠と馬方が宿場を運営する。厩番は救急の馬を先に出せる。",
+        profile: "夜の飛脚のために屋根に火をともし続ける宿場。急ぎの薬を運ぶ馬は優先して送り出される。",
         terrain: Landscape::Crossing,
         entry: (156, 173),
         places: [
             Place { name: "灯火旅籠", at: (151, 104), art: Some(Art::Inn), ground: Landscape::Square, detail: "飛脚の目印となる火が屋根に灯る。" },
             Place { name: "替え馬厩", at: (84, 110), art: Some(Art::Cottage), ground: Landscape::Pasture, detail: "峠越えを終えた馬が休んでいる。" },
-            Place { name: "郵便仕分け所", at: (221, 107), art: Some(Art::Cottage), ground: Landscape::Yard, detail: "列車便と徒歩便に分け、宛名を確かめる。" },
+            Place { name: "郵便仕分け所", at: (221, 107), art: Some(Art::Cottage), ground: Landscape::Yard, detail: "定期便と徒歩便に分け、宛名を確かめる。" },
             Place { name: "薬荷物置場", at: (150, 147), art: Some(Art::Stalls), ground: Landscape::Yard, detail: "谷守へ送る小包は優先札で分けてある。" },
-            Place { name: "旧飛脚道の番屋", at: (211, 35), art: Some(Art::Cottage), ground: Landscape::Heath, detail: "谷へ向かう道。古い折返し表が読める。" },
+            Place { name: "旧飛脚道の番屋", at: (211, 35), art: Some(Art::Cottage), ground: Landscape::Heath, detail: "谷へ向かう近道。古い運行表が貼られている。" },
             Place { name: "峠を望む尾根", at: (129, 51), art: None, ground: Landscape::Heath, detail: "街道から宿の火が見えるかを確かめられる。" },
             Place { name: "宿の裏口", at: (132, 91), art: None, ground: Landscape::Yard, detail: "風が吹くたびに、床下で硬い音がする。" },
             Place { name: "小さな放牧地", at: (58, 135), art: None, ground: Landscape::Pasture, detail: "脚を休める馬が歩ける緩い斜面。" },
@@ -449,9 +449,9 @@ pub(super) static NOX: [Plan; 10] = [
             Story {
                 title: "夜便をつなぐ",
                 beats: &[
-                    Beat::speech(1, "厩番", Worker, "次の馬車を待ってたら、谷守の診療所が閉まっちまう。昔の飛脚道を使えば間に合うか、見てきてくれないか。"),
-                    Beat::record(4, "番屋の運行表", "急ぎの荷は峠の手前から徒歩で運ぶ。夜の番屋には替え馬を一頭残す。借りるときは当番に声を掛けること。"),
-                    Beat::speech(3, "薬荷物の係", Worker, "薬はもう包んであるよ。飛脚道を歩いて届けるか、夜の番屋で替え馬を借りるか。どっちで行こう？"),
+                    Beat::speech(1, "厩番", Worker, "次の定期馬車を待っていたら、谷守の診療所が閉まっちまう。昔の飛脚道を使えば間に合うか、見てきてくれないか。"),
+                    Beat::record(4, "番屋の運行表", "『急ぎの薬は峠の近道から徒歩で届けるか、夜の番屋に残した替え馬を使って運ぶこと』"),
+                    Beat::speech(3, "薬荷物の係", Worker, "薬はもう包んであるよ。近道の山道を歩いて届けるか、番屋で夜の替え馬を借りて走るか、どっちで行こう？"),
                 ],
                 choices: Some([
                     Ending { label: "番屋に夜の馬を置く", text: "峠まで夜便が走り、薬と急ぎの便りを運んだ。宿は当番の交代日を増やした。" },
@@ -501,29 +501,29 @@ pub(super) static NOX: [Plan; 10] = [
     },
     Plan {
         name: "ノクス北門街",
-        profile: "門衛隊が防衛を担い、街区代表が住宅と配給を審議する。",
+        profile: "辺境の北を守る門のそばに広がった町。門衛隊が警備を担い、住民の代表が家と食糧の割当を決める。",
         terrain: Landscape::Fort,
         entry: (157, 172),
         places: [
-            Place { name: "紫旗門と詰所", at: (157, 35), art: Some(Art::StoneGate), ground: Landscape::Stone, detail: "門上の紫の旗は帰還できた部隊の色を受け継ぐ。" },
-            Place { name: "配給所", at: (158, 101), art: Some(Art::Stalls), ground: Landscape::Square, detail: "朝の引換札と夜警の帳面が別々にある。" },
-            Place { name: "西の住宅街", at: (81, 101), art: Some(Art::Inn), ground: Landscape::Stone, detail: "家の数に比べて入居待ちの人が多い。" },
-            Place { name: "旧詰番板と閲覧所", at: (232, 83), art: Some(Art::Cottage), ground: Landscape::Stone, detail: "同じ徽章の下に、年の食い違う二つの日付がある。" },
-            Place { name: "外濠の待合", at: (231, 142), art: None, ground: Landscape::Yard, detail: "遺族と門番の家族が腰を下ろしている。" },
-            Place { name: "旗の繕い場", at: (119, 56), art: Some(Art::Cottage), ground: Landscape::Yard, detail: "裏返した旗に色の異なる継ぎ布がある。" },
-            Place { name: "水漏れの空き家", at: (67, 122), art: Some(Art::Cottage), ground: Landscape::Yard, detail: "鍵は新しく、柱に去年の雨の跡がある。" },
-            Place { name: "夕方の配給窓口", at: (178, 118), art: None, ground: Landscape::Stone, detail: "門へ戻る夜警も立ち寄れる街路に面している。" },
+            Place { name: "紫旗門と詰所", at: (157, 35), art: Some(Art::StoneGate), ground: Landscape::Stone, detail: "門に掲げられた紫の旗は、生還した部隊の色を受け継いでいる。" },
+            Place { name: "配給所", at: (158, 101), art: Some(Art::Stalls), ground: Landscape::Square, detail: "朝の引換札と夜警用の帳面が別々に置かれている。" },
+            Place { name: "西の住宅街", at: (81, 101), art: Some(Art::Inn), ground: Landscape::Stone, detail: "家の数に比べて、入居を待つ人が多い。" },
+            Place { name: "旧詰番板と閲覧所", at: (232, 83), art: Some(Art::Cottage), ground: Landscape::Stone, detail: "同じ部隊の印の下に、年号の食い違う二つの日付がある。" },
+            Place { name: "外濠の待合", at: (231, 142), art: None, ground: Landscape::Yard, detail: "遺族と門番の家族が腰を下ろして休んでいる。" },
+            Place { name: "旗の繕い場", at: (119, 56), art: Some(Art::Cottage), ground: Landscape::Yard, detail: "裏返した旗に、色の異なる継ぎ布が当てられている。" },
+            Place { name: "水漏れの空き家", at: (67, 122), art: Some(Art::Cottage), ground: Landscape::Yard, detail: "鍵は新しく、柱に去年の雨染みが残っている。" },
+            Place { name: "夕方の配給窓口", at: (178, 118), art: None, ground: Landscape::Stone, detail: "門へ戻る夜警も立ち寄れる通り沿いに面している。" },
         ],
         stories: [
             Story {
                 title: "二度帰った部隊",
                 beats: &[
-                    Beat::speech(3, "詰所の衛兵", Guard, "日付が違うのに、詰番板じゃ同じ徽章の部隊が戻ったことになってる。これじゃ遺族に何を話せばいいのか、俺たちにも分からない。"),
-                    Beat::scene(5, "旗の継ぎ布に、戦が終わったあとの年が記されていた。古い部隊色の上に、今の部隊の胸章を縫い付けた跡がある。"),
-                    Beat::speech(0, "詰所の衛兵", Guard, "引換印と旗の記録がそろったよ。遺族と衛兵を一緒に呼ぶか、まず家族にだけ話すか、どうしよう。"),
+                    Beat::speech(3, "詰所の衛兵", Guard, "日付が何年も違うのに、記録板では同じ隊の印が二度戻ったことになってる。これじゃ遺族にどう説明すればいいのか分からない。"),
+                    Beat::scene(5, "旗の継ぎ布に、戦が終わったあとの年号が縫い込まれていた。昔の隊の旗を、今の部隊が受け継いで使っていたのだ。"),
+                    Beat::speech(0, "詰所の衛兵", Guard, "旗が受け継がれた証拠が見つかったよ。遺族と衛兵を一緒に呼んで話すか、まず遺族だけに事情を伝えるか、どうしよう？"),
                 ],
                 choices: Some([
-                    Ending { label: "遺族と門衛に一緒に話す", text: "両者が徽章の継承を同じ席で聞いた。死者の名と現役の隊を分けて記す。" },
+                    Ending { label: "遺族と門衛に一緒に話す", text: "両者が部隊の継承を同じ席で聞いた。戦死者の名と現役の隊を分けて記すことになった。" },
                     Ending { label: "まず遺族へ経緯を知らせる", text: "家族が名札を受け取り、後日、同意した名を詰所で照合する日を決めた。" },
                 ]),
             },
@@ -551,7 +551,7 @@ pub(super) static NOX: [Plan; 10] = [
             Story {
                 title: "旗の裏の色",
                 beats: &[
-                    Beat::speech(5, "旗を手入れする住民", Villager, "旗を返したら、裏が違う色だったんだ。父の隊の色だと思ってたけど、今の隊の色とも違ってね。"),
+                    Beat::speech(5, "旗を手入れする住民", Villager, "旗を裏返したら、裏が違う色だったんだ。父の隊の色だと思ってたけど、今の隊の色とも違ってね。"),
                     Beat::speech(3, "遺族", Villager, "この二色なら覚えてるよ。継ぎ目を見てごらん。ここにある印は、旗を直した日だよ。"),
                     Beat::speech(5, "旗を手入れする住民", Villager, "そろそろ旗を掲げよう。元の隊の色に戻すか、縫い足された色もそのまま見せるか、どうしようか。"),
                 ],
@@ -576,7 +576,7 @@ pub(super) static NOX: [Plan; 10] = [
     },
     Plan {
         name: "谷守の村",
-        profile: "橋の鍵は南北の代表が一本ずつ持つ。非常時は片岸の判断で門を開けられる。",
+        profile: "深い谷の両岸を吊橋で結ぶ村。橋の鍵は南北の代表が一本ずつ預かっている。",
         terrain: Landscape::Valley,
         entry: (159, 173),
         places: [
@@ -609,7 +609,7 @@ pub(super) static NOX: [Plan; 10] = [
                     Beat::speech(2, "診療所の患者", Villager, "ここへ越す前に聞いた子守歌を、もう一度聞きたいんだ。谷底の家で聞いたような気がしてね。"),
                     Beat::scene(4, "古い炉石に手を当てると、短い歌が聞こえた。後半は沢の音にかき消されてしまう。"),
                     Beat::speech(1, "石積みの歌い手", Worker, "その節なら、仕事歌の頭によく似てるよ。続きが分かるかもしれない。診療所に連れてってくれる？"),
-                    Beat::scene(2, "患者は歌い手の節を聞き、思い出した部分を小声でつないだ。隣で聞いていた子も、帰り道に続きを口ずさんだ。"),
+                    Beat::scene(2, "患者は歌い手の節を聞き、思い出した歌詞を小声でつないだ。同じ部屋で休んでいた子どもたちも、楽しそうに続きを口ずさんだ。"),
                 ],
                 choices: None,
             },
@@ -639,7 +639,7 @@ pub(super) static NOX: [Plan; 10] = [
                     Beat::speech(2, "診療所の受付", Villager, "次の診察日が近いね。往診札で知らせるか、橋の手前で持ち物を一緒に確認するか、どっちから試そう？"),
                 ],
                 choices: Some([
-                    Ending { label: "往診の印を掛ける", text: "往診札が出た日には、医者が薬を持って橋を渡った。患者は自分で歩ける日にだけ診療所へ通うことになった。" },
+                    Ending { label: "往診を頼む札を掛ける", text: "往診札が出た日には、医者が薬を持って橋を渡った。患者は自分で歩ける日にだけ診療所へ通うことになった。" },
                     Ending { label: "付き添いの当番を頼む", text: "当番が診察券を一緒に確かめ、帰りに古い沢の話を聞いた。" },
                 ]),
             },
@@ -647,13 +647,13 @@ pub(super) static NOX: [Plan; 10] = [
     },
     Plan {
         name: "灰石の市",
-        profile: "市の組合が露店の番地を貸す。拾得物の引渡しには市役の立会いがいる。",
+        profile: "河原の交換市から発展した市場町。落とし物や遺族の捜し物は、市の立会いのもとで返される。",
         terrain: Landscape::River,
         entry: (116, 173),
         places: [
-            Place { name: "時計塔広場", at: (158, 87), art: Some(Art::Clock), ground: Landscape::Square, detail: "置き時計を持たない商人に開市の時刻を知らせる。" },
-            Place { name: "鑑定と拾得所", at: (78, 93), art: Some(Art::Inn), ground: Landscape::Stone, detail: "遺族の申し出と売り手の帳面を別々に扱う。" },
-            Place { name: "南の河原市", at: (153, 132), art: Some(Art::Stalls), ground: Landscape::Shore, detail: "日暮れまで日用品と使い古した工具を売る。" },
+            Place { name: "時計塔広場", at: (158, 87), art: Some(Art::Clock), ground: Landscape::Square, detail: "置き時計を持たない商人に、開市の時刻を知らせる広場。" },
+            Place { name: "鑑定と拾得所", at: (78, 93), art: Some(Art::Inn), ground: Landscape::Stone, detail: "遺族の捜し物と売り手の帳面を別々に扱っている。" },
+            Place { name: "南の河原市", at: (153, 132), art: Some(Art::Stalls), ground: Landscape::Shore, detail: "日暮れまで日用品や使い古した工具が並ぶ。" },
             Place { name: "研ぎ直し長屋", at: (162, 37), art: Some(Art::Cottage), ground: Landscape::Stone, detail: "研ぎ屋と荷運び人が仕事を受ける長屋。" },
             Place { name: "塔の歯止め足場", at: (181, 82), art: None, ground: Landscape::Stone, detail: "開市の鐘を調節する歯止めに手が届く。" },
             Place { name: "貸し露店", at: (196, 119), art: Some(Art::Stalls), ground: Landscape::Yard, detail: "行商が荷を取りに行く間、店を預けようとしている。" },
@@ -667,7 +667,7 @@ pub(super) static NOX: [Plan; 10] = [
                     Beat::speech(1, "市の係", Worker, "研ぎ直しを待ってる工具に、遺族が捜してる印があるって話だ。研ぎ屋が手を付ける前に、確かめてきてくれないか。"),
                     Beat::speech(6, "荷運び人", Traveler, "ほら、去年の届け控え。形はこの工具と同じだね。印があるとしたら、刃じゃなくて握りのほうだよ。"),
                     Beat::speech(3, "研ぎ屋", Worker, "柄を外したよ。握りの裏に印が残ってる。欠けてるところまで、あの家族が話してたとおりだ。"),
-                    Beat::scene(1, "市の係が呼んだ家族は、印に指を当ててしばらく工具を眺めた。やがて、また使ってくれるなら貸したいと申し出た。"),
+                    Beat::scene(1, "市の係が家族を呼び、工具の印を確かめてもらった。家族は『形見として持ち帰るか、このまま研ぎ屋に預けて役立ててもらうか』と考え込んでいる。"),
                 ],
                 choices: Some([
                     Ending { label: "遺族のもとへ返す", text: "工具は家の台所棚に帰った。市役は古い道具を研ぐ前の照合を始めた。" },
@@ -698,9 +698,9 @@ pub(super) static NOX: [Plan; 10] = [
             Story {
                 title: "尋ね物は靴一足",
                 beats: &[
-                    Beat::speech(1, "落とし物係", Worker, "片方だけの靴が二つ届いたんだ。持ち主が探してる靴の説明は、二人とも全然違うんだよ。"),
-                    Beat::scene(6, "ぬかるみには片方だけ深い足跡が残っていた。靴底を見ると、片方に体重がかかっても歩きやすいよう、縫い目が補強されている。"),
-                    Beat::speech(3, "元靴職人", Worker, "この二つなら、私が直して一足にしたよ。二人が持って帰るときに、互いの靴を片方ずつ取り違えたんだ。"),
+                    Beat::speech(1, "落とし物係", Worker, "『片方だけ落とした』と二人が届け出たんだが、見つかった靴の特徴が二人の話とちぐはぐなんだ。"),
+                    Beat::scene(6, "河原のぬかるみに片方だけ深い足跡がある。見つかった二つの靴を並べると、どちらも左足用で、靴底の縫い方が同じ職人の手仕事だった。"),
+                    Beat::speech(3, "元靴職人", Worker, "ああ、思い出した！　この二人に靴を返したとき、左右のサイズが違う片方ずつを取り違えて渡してしまったんだ。今すぐ二人を呼んで交換してもらおう。"),
                 ],
                 choices: None,
             },

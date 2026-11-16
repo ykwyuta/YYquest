@@ -488,8 +488,8 @@ impl Game {
     fn start_prologue(&mut self) {
         self.scene = Scene::Field;
         self.message = Some(Message::narration([
-            "灰灯りの村に、森から水が届かなくなった。",
-            "アレンは父の剣を携え、炉番を訪ねる。",
+            "東の森から、灰灯りの村へ水が来なくなった。",
+            "アレンは村の炉を守る「炉番」のもとへ向かう。",
         ]));
     }
 
@@ -601,8 +601,8 @@ impl Game {
                 self.clear_held_direction();
                 self.after = After::None;
                 self.message = Some(Message::guide([
-                    "守護精霊が導くほうに進んでみよう。",
-                    "光の跡をたどれば、次の目的地に着く。",
+                    "案内精霊が光で道を照らしている。",
+                    "光のあとをたどって、目的地へ向かおう。",
                 ]));
                 return;
             }
@@ -642,8 +642,8 @@ impl Game {
                     Hearth,
                     Worried,
                     [
-                        "アレン、東の森で笛が鳴ったよ。水門を見てきておくれ。",
-                        "あんたの父さんは、その剣で水門を開けてた。持っておいき。",
+                        "森の水路が止まったうえ、東の森から笛の音が聞こえたよ。",
+                        "古い水門は父さんの剣で開けられる。持って見てきておくれ。",
                     ],
                 )
             }
@@ -653,16 +653,16 @@ impl Game {
                     Lilith,
                     Speaking,
                     [
-                        "来てくれたんだ。さっき笛を吹いたの、私。",
-                        "門の下に何かいる。私が門を支えるから、追い払ってくれる？",
+                        "村の人？　さっき笛を吹いたの、私。リリスっていうの。",
+                        "水門が引っかかって開かないの。剣で持ち上げるのを手伝ってくれない？",
                     ],
                 )
             }
             Intro::Sluice => {
                 self.after = After::Fight(Lesson::Sluice);
                 Message::narration([
-                    "アレンが剣を留め具に差し込むと、水門が持ち上がった。",
-                    "リリスが門を支える。その足元から魔物が飛び出した。",
+                    "アレンが父の剣を留め具に差し込むと、重い水門が持ち上がった。",
+                    "リリスが門を支えたその瞬間、水路の奥から魔物が飛び出した！",
                 ])
             }
             Intro::Memorial => {
@@ -671,8 +671,8 @@ impl Game {
                     Lilith,
                     Resolute,
                     [
-                        "聞こえる？　石碑から、さっきの剣と同じ音がする。",
-                        "私が精霊を呼んで霧を払う。少しの間、守ってくれる？",
+                        "石碑が濃い霧に覆われて、さっきの音をかき消しているみたい。",
+                        "私が精霊の力で霧を払うから、少しの間だけ魔物を引き受けて！",
                     ],
                 )
             }
@@ -694,8 +694,8 @@ impl Game {
                     Hearth,
                     Smile,
                     [
-                        "水が戻ったよ。二人とも、よくやってくれたね。",
-                        "父さんの帰還簿なら、前に住んでた家にあるよ。",
+                        "村に水が戻ったよ。二人とも、本当に助かった！",
+                        "そうだ、お父さんの帰還記録なら、村の旧宅にしまってあるよ。",
                     ],
                 )
             }
@@ -713,8 +713,8 @@ impl Game {
                     Speaker::Allen,
                     Expression::Thoughtful,
                     [
-                        "どうして父さんがあの日、砦に残ったのか知りたい。",
-                        "家に手がかりがあるかもしれない。一緒に行く？",
+                        "今の声……父さんは救助船を見送って、あの日、砦に残ったのか？",
+                        "父さんの家に記録があるはずだ。リリスも一緒に来てくれないか？",
                     ],
                 ));
                 self.after = After::Reply;
@@ -724,8 +724,8 @@ impl Game {
                     Speaker::Lilith,
                     Expression::Resolute,
                     [
-                        "うん、私も一緒に行く。",
-                        "どうして石碑から私を呼ぶ声がしたのか、確かめたい。",
+                        "うん、私も行く。自分の名前以外の記憶がなくて……",
+                        "なぜ石碑から私を呼ぶ声が聞こえたのか、確かめたいの。",
                     ],
                 ));
                 self.after = After::Recruit;
@@ -766,8 +766,8 @@ impl Game {
                 Speaker::Lilith,
                 Expression::Worried,
                 [
-                    "よかった、目を開けた。霧の外まで連れてきたんだ。",
-                    "立てそう？　もう一度行くなら、今度は私もそばにいる。",
+                    "よかった、気がついたんだね。急いで霧の外まで運んだよ。",
+                    "無理しないで。もう一度挑むなら、今度は私もそばにいるから。",
                 ],
             ));
             return;
@@ -779,8 +779,8 @@ impl Game {
                     Speaker::Lilith,
                     Expression::Relieved,
                     [
-                        "水が流れ出したね。あれ、北のほうからも剣と同じ音がする。",
-                        "石碑のほうだ。先に見てくるね。",
+                        "水路が通ったね！　……あれ、今アレンの剣が鳴らなかった？",
+                        "北の石碑からも同じ音が返ってくる。先に様子を見てくるね！",
                     ],
                 )
             }
@@ -788,10 +788,10 @@ impl Game {
                 self.intro = Intro::Choice;
                 self.after = After::Ask;
                 Message::record(
-                    "石碑に残った声",
+                    "石碑から響く過去の声",
                     [
-                        "ガウェイン、三つの灯が見えた。船はそっちへ向かってる。",
-                        "リリス、船が着くまで灯を絶やすな。",
+                        "『ガウェイン、砦の三つの灯が見えた。救助船をそっちへ向かわせる』",
+                        "『リリス、船が着くまで砦の灯を絶やすな』",
                     ],
                 )
             }
@@ -811,8 +811,8 @@ impl Game {
             .as_ref()?
             .lesson
             .map(|(lesson, _)| match lesson {
-                Lesson::Sluice => "たたかう・まもる　刻印魔法は記憶を使う",
-                Lesson::Memorial => "リリスの精霊共鳴は記憶を消費しない",
+                Lesson::Sluice => "「刻印魔法」は強いが、使うと記憶が失われる",
+                Lesson::Memorial => "「精霊共鳴」は記憶を使わずリリスと協力して攻撃",
             })
     }
 
@@ -920,7 +920,7 @@ impl Game {
                         (
                             16,
                             battle.enemy.damage(),
-                            format!("刻印魔法！「{}」が風化した。", MEMORIES[self.memories]),
+                            format!("刻印魔法！　記憶「{}」が失われた…", MEMORIES[self.memories]),
                         )
                     }
                     2 if can_resonate => (9, battle.enemy.damage(), "リリスの精霊共鳴！".into()),
@@ -1200,7 +1200,7 @@ mod tests {
         assert_eq!((game.x, game.y), (13, 4));
         game.advance_traffic(STEP_MS);
         assert_eq!((game.x, game.y), (13, 4));
-        assert!(game.message.unwrap().lines[0].contains("守護精霊"));
+        assert!(game.message.unwrap().lines[0].contains("案内精霊"));
         game.input(Key::Confirm);
         game.advance_traffic(STEP_MS * 2);
         assert!(game.message.is_none());
@@ -1279,7 +1279,7 @@ mod tests {
         );
         assert_eq!(
             game.world_map.campaign.beat().unwrap().title,
-            "途切れた帰還簿"
+            "途切れた帰還記録"
         );
     }
 

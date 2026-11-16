@@ -82,10 +82,10 @@ impl Item {
         match self.data().1 {
             Kind::Material => "調薬や鍛冶の素材".into(),
             Kind::Heal(hp) => format!("アレンのHPを {hp} 回復"),
-            Kind::Spell(power) => format!("戦闘専用・記憶を使わず {power} ダメージ"),
+            Kind::Spell(power) => format!("戦闘用：記憶を使わずに {power} ダメージ"),
             Kind::Weapon(power) => format!("通常攻撃力 {}", 6 + power),
             Kind::Armor(guard) => format!("受けるダメージを {guard} 軽減"),
-            Kind::Charm(guard) => format!("魔獣の反撃ダメージをさらに {guard} 軽減"),
+            Kind::Charm(guard) => format!("受けるダメージをさらに {guard} 軽減"),
         }
     }
 }
@@ -170,9 +170,9 @@ impl Service {
 
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::Shop => "よろず商と取引",
+            Self::Shop => "よろず屋で買い物",
             Self::Brew => "傷薬を調合する",
-            Self::Forge => "ドワーフの鍛冶屋",
+            Self::Forge => "鍛冶屋で装備を作る",
             Self::Rest(0) => "無料で手当てを受ける",
             Self::Rest(_) => "旅籠で休む",
             Self::Gather(_) => "素材を採集する",
