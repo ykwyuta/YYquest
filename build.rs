@@ -85,7 +85,12 @@ fn main() {
     fs::write(out.join("title.rgb"), title).unwrap();
     let mut characters = Vec::new();
     // Each sheet holds both characters facing south, west, east and north.
-    for path in ["assets/prologue-characters.png", "assets/prologue-walk.png"] {
+    for path in [
+        "assets/prologue-characters.png",
+        "assets/prologue-walk.png",
+        "assets/prologue-walk-opposite.png",
+        "assets/prologue-walk-passing.png",
+    ] {
         let heroes = load(path);
         for row in 0..2 {
             for col in 0..4 {

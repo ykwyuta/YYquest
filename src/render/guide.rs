@@ -1,15 +1,15 @@
-use std::collections::VecDeque;
-
 use super::{Frame, Sprite, DISPLAY_SCALE, GOLD, INK, MINT};
-use crate::{art_sizes, island::Position, town::State};
+use crate::{
+    art_sizes,
+    island::Position,
+    path::{Distances, DIRECTIONS, UNREACHABLE},
+    town::State,
+};
 
 const SPIRIT: Sprite = Sprite::new(
     include_bytes!(concat!(env!("OUT_DIR"), "/guide-spirit.rgba")),
     art_sizes::MAP_OBJECT,
 );
-
-const DIRECTIONS: [Position; 4] = [(0, -1), (1, 0), (0, 1), (-1, 0)];
-const UNREACHABLE: u16 = u16::MAX;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Area {
@@ -33,50 +33,22 @@ pub(super) struct Route {
     area: Area,
     goal: Position,
     size: Position,
-    remaining: Vec<u16>,
+    remaining: Distances,
 }
 
 impl Route {
     fn new(guide: &Guidance, walkable: impl Fn(Position) -> bool) -> Self {
-        let (w, h) = guide.size;
-        let mut route = Self {
+        Self {
             area: guide.area,
             goal: guide.to,
             size: guide.size,
-            remaining: vec![UNREACHABLE; (w * h) as usize],
-        };
-        let Some(end) = route.index(guide.to).filter(|_| walkable(guide.to)) else {
-            return route;
-        };
-        // A reverse search can be reused while the player walks or walks away.
-        route.remaining[end] = 0;
-        let mut pending = VecDeque::from([guide.to]);
-        while let Some((x, y)) = pending.pop_front() {
-            let steps = route.distance((x, y)) + 1;
-            for (dx, dy) in DIRECTIONS {
-                let next = (x + dx, y + dy);
-                let Some(index) = route.index(next) else {
-                    continue;
-                };
-                if route.remaining[index] == UNREACHABLE && walkable(next) {
-                    route.remaining[index] = steps;
-                    pending.push_back(next);
-                }
-            }
+            remaining: Distances::new(guide.size, guide.to, walkable),
         }
-        route
-    }
-
-    fn index(&self, (x, y): Position) -> Option<usize> {
-        let (w, h) = self.size;
-        ((0..w).contains(&x) && (0..h).contains(&y)).then(|| (y * w + x) as usize)
     }
 
     fn distance(&self, at: Position) -> u16 {
-        self.index(at)
-            .map_or(UNREACHABLE, |index| self.remaining[index])
+        self.remaining.get(at)
     }
-
     fn lead(&self, (x, y): Position, prefer_road: impl Fn(Position) -> bool) -> Option<Position> {
         let current = self.distance((x, y));
         if current == 0 || current == UNREACHABLE {

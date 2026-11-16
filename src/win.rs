@@ -3,6 +3,7 @@ use std::{
     ffi::c_void,
     mem::{size_of, zeroed},
     ptr::{null, null_mut},
+    time::Instant,
 };
 
 use windows_sys::Win32::{
@@ -20,10 +21,13 @@ use yyquest::{
 const CLASS: windows_sys::core::PCWSTR = windows_sys::w!("YYquest");
 const TRAFFIC_TIMER: usize = 1;
 const GAMEPAD_TIMER: usize = 2;
-const TRAFFIC_INTERVAL: u32 = 70;
+const TRAFFIC_INTERVAL: u32 = 16;
+const KEYBOARD: u32 = 1;
+const GAMEPAD: u32 = 2;
 
 thread_local! {
     static GAMEPAD_BUTTONS: Cell<u16> = const { Cell::new(0) };
+    static LAST_FRAME: Cell<Instant> = Cell::new(Instant::now());
     static SESSION: RefCell<(Game, Frame)> = RefCell::new((Game::new(), Frame::new()));
 }
 
@@ -82,11 +86,28 @@ unsafe extern "system" fn window_proc(
             let code = wparam as u32;
             if Key::from_code(code).is_some() {
                 let repeat = lparam & (1 << 30) != 0;
-                if SESSION.with(|session| session.borrow_mut().0.input_code(code, repeat)) {
+                if !repeat
+                    && SESSION.with(|session| {
+                        let mut session = session.borrow_mut();
+                        session.0.press_direction(code, KEYBOARD)
+                            || session.0.input_code(code, false)
+                    })
+                {
                     InvalidateRect(window, null(), 0);
                 }
                 return 0;
             }
+        }
+        WM_KEYUP => {
+            SESSION.with(|session| {
+                session
+                    .borrow_mut()
+                    .0
+                    .release_direction(wparam as u32, KEYBOARD)
+            });
+        }
+        WM_KILLFOCUS => {
+            SESSION.with(|session| session.borrow_mut().0.clear_held_direction());
         }
         WM_TIMER if wparam == GAMEPAD_TIMER => {
             if GetForegroundWindow() == window {
@@ -99,8 +120,11 @@ unsafe extern "system" fn window_proc(
             return 0;
         }
         WM_TIMER if wparam == TRAFFIC_TIMER => {
+            let now = Instant::now();
+            let elapsed =
+                LAST_FRAME.with(|last| now.duration_since(last.replace(now)).as_millis()) as u32;
             if IsIconic(window) == 0
-                && SESSION.with(|session| session.borrow_mut().0.advance_traffic(TRAFFIC_INTERVAL))
+                && SESSION.with(|session| session.borrow_mut().0.advance_traffic(elapsed))
             {
                 InvalidateRect(window, null(), 0);
             }
@@ -137,8 +161,8 @@ unsafe fn poll_gamepad() -> bool {
     let buttons = (0..4)
         .find(|&index| XInputGetState(index, &mut state) == 0)
         .map_or(0, |_| state.Gamepad.wButtons);
-    let pressed = buttons & !GAMEPAD_BUTTONS.replace(buttons);
-    if pressed == 0 {
+    let previous = GAMEPAD_BUTTONS.replace(buttons);
+    if buttons == previous {
         return false;
     }
     SESSION.with(|session| {
@@ -151,7 +175,12 @@ unsafe fn poll_gamepad() -> bool {
             (XINPUT_GAMEPAD_B, 27),
             (XINPUT_GAMEPAD_A, 13),
         ] {
-            if pressed & button != 0 {
+            if (buttons ^ previous) & button == 0 {
+                continue;
+            }
+            if buttons & button == 0 {
+                session.0.release_direction(code, GAMEPAD);
+            } else if !session.0.press_direction(code, GAMEPAD) {
                 session.0.input_code(code, false);
             }
         }

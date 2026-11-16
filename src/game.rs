@@ -3,7 +3,8 @@ use crate::{
     dialogue::{Expression, Message, Speaker},
     economy::{Goods, Menu, OptionRow, Page},
     intro::{After, Intro, Lesson, HEARTH, MEETING, MEMORIAL, SLUICE},
-    walk::Walk,
+    path::Distances,
+    walk::{Walk, STEP_MS},
     world_map::{Region, WorldMap},
 };
 
@@ -79,6 +80,7 @@ pub const MAP: [&[u8; 18]; 10] = [
     b"~#ggggg##########~",
     b"~~~~~~~~~~~~~~~~~~",
 ];
+pub(crate) const PROLOGUE_SIZE: (i32, i32) = (MAP[0].len() as i32, MAP.len() as i32);
 
 pub const MAX_HP: u8 = 24;
 pub const MEMORIES: [&str; 3] = ["父が剣を研ぐ音", "帰りを待つ家の灯り", "父の最後の言葉"];
@@ -192,6 +194,13 @@ pub struct Game {
     pub(crate) companion_walk: Walk,
     pub(crate) goods: Goods,
     pub(crate) economy_menu: Option<Menu>,
+    held_direction: Option<HeldDirection>,
+}
+
+struct HeldDirection {
+    code: u32,
+    source: u32,
+    until_step: u32,
 }
 
 impl Game {
@@ -219,6 +228,7 @@ impl Game {
             companion_walk: Walk::default(),
             goods: Goods::new(),
             economy_menu: None,
+            held_direction: None,
         }
     }
 
@@ -242,21 +252,86 @@ impl Game {
     }
 
     pub fn advance_traffic(&mut self, milliseconds: u32) -> bool {
-        if self.map_open {
+        let animated = if self.map_open {
             if let Some(town) = &mut self.world_map.town {
-                return town.walk.advance(milliseconds);
+                town.walk.advance(milliseconds)
+            } else {
+                self.world_map
+                    .island
+                    .as_mut()
+                    .is_some_and(|island| island.advance(milliseconds))
             }
-            return self
-                .world_map
-                .island
-                .as_mut()
-                .is_some_and(|island| island.advance(milliseconds));
-        }
-        if matches!(self.scene, Scene::Field) {
+        } else if matches!(self.scene, Scene::Field) {
             self.walk.advance(milliseconds) | self.companion_walk.advance(milliseconds)
         } else {
             false
+        };
+        animated | self.advance_held_direction(milliseconds)
+    }
+
+    fn can_repeat_walk(&self) -> bool {
+        if self.economy_menu.is_some() {
+            return false;
         }
+        if self.map_open {
+            !self.world_map.campaign.reading
+                && self.world_map.island.is_some()
+                && self
+                    .world_map
+                    .town
+                    .as_ref()
+                    .is_none_or(|town| matches!(town.panel, crate::town::Panel::Explore))
+        } else {
+            matches!(self.scene, Scene::Field) && self.message.is_none() && !self.journal
+        }
+    }
+
+    pub fn press_direction(&mut self, code: u32, source: u32) -> bool {
+        if !Key::from_code(code).is_some_and(|key| key.direction().is_some()) {
+            return false;
+        }
+        self.clear_held_direction();
+        let exploring = self.can_repeat_walk();
+        let handled = self.input_code(code, false);
+        if exploring && self.can_repeat_walk() {
+            self.held_direction = Some(HeldDirection {
+                code,
+                source,
+                until_step: STEP_MS,
+            });
+        }
+        handled
+    }
+
+    pub fn release_direction(&mut self, code: u32, source: u32) {
+        if self
+            .held_direction
+            .as_ref()
+            .is_some_and(|held| held.code == code && held.source == source)
+        {
+            self.clear_held_direction();
+        }
+    }
+
+    pub fn clear_held_direction(&mut self) {
+        self.held_direction = None;
+    }
+
+    fn advance_held_direction(&mut self, milliseconds: u32) -> bool {
+        if !self.can_repeat_walk() {
+            self.clear_held_direction();
+            return false;
+        }
+        let Some(held) = &mut self.held_direction else {
+            return false;
+        };
+        if milliseconds < held.until_step {
+            held.until_step -= milliseconds;
+            return false;
+        }
+        let code = held.code;
+        held.until_step = STEP_MS - (milliseconds - held.until_step) % STEP_MS;
+        self.input_code(code, true)
     }
 
     pub fn debug_back_control(&self) -> bool {
@@ -268,8 +343,11 @@ impl Game {
             return false;
         };
         let title = !self.map_open && matches!(self.scene, Scene::Title);
-        if repeat && (title || key.direction().is_none()) {
+        if repeat && (!self.can_repeat_walk() || key.direction().is_none()) {
             return false;
+        }
+        if key.direction().is_none() {
+            self.clear_held_direction();
         }
         if title {
             let sequence = debug::TITLE_CODE;
@@ -508,19 +586,39 @@ impl Game {
             return;
         };
         self.facing = Facing::from_step(dx, dy).unwrap_or(self.facing);
-        let (x, y) = (self.x + dx, self.y + dy);
-        if !Self::field_walkable((x, y)) {
+        let current = (self.x, self.y);
+        let next = (self.x + dx, self.y + dy);
+        if !Self::field_walkable(next) {
             return;
         }
-        self.walk.step();
-        if self.lilith {
-            self.companion_facing = self.companion_position.map_or(self.facing, |(cx, cy)| {
-                Facing::from_step(self.x - cx, self.y - cy).unwrap_or(self.companion_facing)
-            });
-            self.companion_position = Some((self.x, self.y));
-            self.companion_walk.step();
+        if self.intro != Intro::Nox {
+            let route = Distances::new(
+                PROLOGUE_SIZE,
+                self.intro.destination().0,
+                Self::field_walkable,
+            );
+            if route.get(next) >= route.get(current) {
+                self.clear_held_direction();
+                self.after = After::None;
+                self.message = Some(Message::narration([
+                    "守護精霊が導くほうに進んでみよう。",
+                    "光の跡をたどれば、次の目的地に着く。",
+                ]));
+                return;
+            }
         }
-        (self.x, self.y) = (x, y);
+        self.walk.step(current, next);
+        if self.lilith {
+            if let Some((cx, cy)) = self.companion_position {
+                self.companion_facing =
+                    Facing::from_step(self.x - cx, self.y - cy).unwrap_or(self.companion_facing);
+                self.companion_walk.step((cx, cy), current);
+            } else {
+                self.companion_facing = self.facing;
+            }
+            self.companion_position = Some(current);
+        }
+        (self.x, self.y) = next;
     }
 
     fn inspect_intro(&mut self) {
@@ -1046,24 +1144,71 @@ mod tests {
 
     #[test]
     fn party_members_face_their_own_direction_when_turning() {
+        use crate::walk::Pose;
         let mut game = Game::new();
         game.scene = Scene::Field;
+        game.intro = Intro::Nox;
         game.lilith = true;
         (game.x, game.y) = (13, 6);
         game.input(Key::Left);
         assert_eq!(game.facing, Facing::West);
         assert_eq!(game.companion_facing, Facing::West);
         assert_eq!(game.companion_position, Some((13, 6)));
-        assert!(game.walk.alternate());
+        assert_eq!(game.walk.offset(24), (24, 0));
         assert!(game.advance_traffic(80));
+        assert_eq!(game.walk.pose(), Pose::Passing);
+        assert!(game.walk.offset(24).0 > 0 && game.walk.offset(24).0 < 24);
         assert!(game.advance_traffic(80));
-        assert!(!game.walk.alternate());
+        assert_eq!(game.walk.pose(), Pose::Standing);
 
         game.input(Key::Up);
         assert_eq!((game.x, game.y), (12, 5));
         assert_eq!(game.facing, Facing::North);
         assert_eq!(game.companion_facing, Facing::West);
         assert_eq!(game.companion_position, Some((12, 6)));
+    }
+
+    #[test]
+    fn held_direction_walks_until_released_and_alternates_the_stride() {
+        use crate::walk::Pose;
+        let mut game = Game::new();
+        game.scene = Scene::Field;
+        game.intro = Intro::Nox;
+        assert!(game.press_direction(39, 1));
+        assert_eq!((game.x, game.y), (4, 4));
+        game.advance_traffic(48);
+        assert_eq!(game.walk.pose(), Pose::Stride);
+        game.advance_traffic(STEP_MS - 48);
+        assert_eq!((game.x, game.y), (5, 4));
+        game.advance_traffic(48);
+        assert_eq!(game.walk.pose(), Pose::Opposite);
+        game.release_direction(39, 1);
+        game.advance_traffic(STEP_MS * 2);
+        assert_eq!((game.x, game.y), (5, 4));
+        assert_eq!(game.walk.pose(), Pose::Standing);
+    }
+
+    #[test]
+    fn guardian_stops_detours_and_cancels_a_held_direction() {
+        let mut game = Game::new();
+        game.scene = Scene::Field;
+        game.intro = Intro::Meeting;
+        (game.x, game.y) = (12, 4);
+        game.press_direction(39, 1);
+        assert_eq!((game.x, game.y), (13, 4));
+        game.advance_traffic(STEP_MS);
+        assert_eq!((game.x, game.y), (13, 4));
+        assert!(game.message.unwrap().lines[0].contains("守護精霊"));
+        game.input(Key::Confirm);
+        game.advance_traffic(STEP_MS * 2);
+        assert!(game.message.is_none());
+        assert_eq!(game.intro, Intro::Meeting);
+        assert_eq!((game.x, game.y), (13, 4));
+        game.press_direction(40, 1);
+        game.advance_traffic(STEP_MS);
+        assert_eq!((game.x, game.y), MEETING);
+        game.input(Key::Confirm);
+        assert!(game.message.unwrap().lines[0].contains("村の水"));
     }
 
     #[test]
