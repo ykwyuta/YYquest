@@ -19,7 +19,7 @@ main {
     var(--edge-bottom) max(10px, env(safe-area-inset-left));
 }
 
-main:has(#cache-refresh:not([hidden])) { --footer-height: 52px; }
+main:has(.toolbar button:not([hidden])) { --footer-height: 52px; }
 
 .game-stage {
   --canvas-ratio: 1.333333;
@@ -43,7 +43,7 @@ canvas {
 }
 
 #controls, #rotate-tip, .toolbar { display: none; }
-.toolbar:has(#cache-refresh:not([hidden])) {
+.toolbar:has(button:not([hidden])) {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -58,6 +58,7 @@ canvas {
   background: #151824;
   font-size: 12px;
 }
+#sound-toggle[aria-pressed="false"] { opacity: 0.65; }
 #status { margin: 8px 0 0; text-align: center; font-size: 12px; }
 
 button {

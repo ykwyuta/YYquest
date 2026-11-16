@@ -1,3 +1,4 @@
+mod gathering;
 mod map;
 mod nox;
 #[cfg(test)]
@@ -13,6 +14,7 @@ use crate::{
     game::{Facing, Key},
     island::Position,
 };
+pub(crate) use gathering::Gathering;
 pub(crate) use map::{Landscape, Surface, HEIGHT, WIDTH};
 use nox::NOX;
 
@@ -122,7 +124,7 @@ pub(crate) fn plan(index: usize) -> &'static Plan {
 }
 pub(crate) type Progress = [[State; 5]; COUNT];
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum State {
     #[default]
     New,
@@ -208,10 +210,24 @@ pub(crate) struct Town {
     pub(crate) low_tide: bool,
     pub(crate) main: Option<&'static ChapterBeat>,
     pub(crate) walk: Walk,
+    pub(crate) gathering: Option<Gathering>,
     track_side: bool,
 }
 
 impl Town {
+    pub(crate) fn tracking_side(&self) -> bool {
+        self.track_side
+    }
+
+    pub(crate) fn restore_exploration(&mut self, tracked: usize, side: bool, low_tide: bool) {
+        self.tracked = tracked;
+        self.track_side = side;
+        self.low_tide = low_tide && self.index == 1;
+        if self.low_tide {
+            self.landscape.set_low_tide(true);
+        }
+    }
+
     pub(crate) fn new(index: usize, states: &[State; 5]) -> Self {
         let plan = &NOX[index];
         let mut landscape = map::TownMap::new(plan, index);
@@ -231,6 +247,7 @@ impl Town {
             low_tide: false,
             main: None,
             walk: Walk::default(),
+            gathering: None,
             track_side: false,
         }
     }

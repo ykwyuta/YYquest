@@ -3,6 +3,7 @@ mod campaign;
 mod debug;
 mod dialogue;
 mod economy;
+mod fort;
 pub mod game;
 mod intro;
 mod island;
@@ -29,6 +30,51 @@ mod web {
 
     thread_local! {
         static SESSION: RefCell<(Game, Frame)> = RefCell::new((Game::new(), Frame::new()));
+        static SAVE_BUFFER: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
+    }
+
+    #[no_mangle]
+    extern "C" fn checkpoint_size() -> usize {
+        let checkpoint = SESSION.with(|session| session.borrow().0.checkpoint());
+        SAVE_BUFFER.with(|buffer| {
+            let mut buffer = buffer.borrow_mut();
+            *buffer = checkpoint.unwrap_or_default();
+            buffer.len()
+        })
+    }
+
+    #[no_mangle]
+    extern "C" fn checkpoint_ptr() -> *const u8 {
+        SAVE_BUFFER.with(|buffer| buffer.borrow().as_ptr())
+    }
+
+    #[no_mangle]
+    extern "C" fn prepare_save_load(size: usize) -> *mut u8 {
+        if size == 0 || size > Game::MAX_SAVE_BYTES {
+            return std::ptr::null_mut();
+        }
+        SAVE_BUFFER.with(|buffer| {
+            let mut buffer = buffer.borrow_mut();
+            buffer.resize(size, 0);
+            buffer.as_mut_ptr()
+        })
+    }
+
+    #[no_mangle]
+    extern "C" fn offer_continue() -> bool {
+        let bytes = SAVE_BUFFER.with(|buffer| std::mem::take(&mut *buffer.borrow_mut()));
+        SESSION.with(|session| session.borrow_mut().0.offer_continue(&bytes))
+    }
+
+    #[no_mangle]
+    extern "C" fn take_sound() -> u32 {
+        SESSION.with(|session| {
+            session
+                .borrow_mut()
+                .0
+                .take_sound()
+                .map_or(0, |cue| cue as u32)
+        })
     }
 
     #[no_mangle]
@@ -87,7 +133,9 @@ mod web {
             let session = session.borrow();
             let game = &session.0;
             if game.map_open {
-                game.world_map.campaign.reading || game.world_map.town.as_ref().is_some_and(|town| {
+                game.world_map.campaign.panel.is_some_and(|panel| !matches!(panel, crate::campaign::VoyagePanel::Consent(_))) || game.world_map.fort.as_ref().is_some_and(|fort| {
+                    !matches!(fort.panel, crate::fort::Panel::Walk | crate::fort::Panel::Lamps(_) | crate::fort::Panel::Return(_))
+                }) || game.world_map.town.as_ref().is_some_and(|town| {
                     matches!(town.panel, crate::town::Panel::Talk { next, .. } if !matches!(next, crate::town::Followup::Choose(..)))
                 })
             } else {
@@ -109,7 +157,9 @@ mod web {
     extern "C" fn debug_back_control() -> bool {
         SESSION.with(|session| {
             let session = session.borrow();
-            session.0.economy_menu.is_some() || session.0.debug_back_control()
+            session.0.economy_menu.is_some()
+                || session.0.debug_back_control()
+                || session.0.confirm_overwrite
         })
     }
 

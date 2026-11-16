@@ -5,7 +5,7 @@ pub(crate) const MEETING: Position = (13, 6);
 pub(crate) const SLUICE: Position = (10, 7);
 pub(crate) const MEMORIAL: Position = (14, 2);
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum Intro {
     #[default]
     Hearth,

@@ -1,12 +1,16 @@
 use crate::{
+    campaign::VoyagePanel,
     debug::{self, Target},
     dialogue::{Expression, Message, Speaker},
     economy::{Goods, Menu, OptionRow, Page},
+    fort,
     intro::{After, Intro, Lesson, HEARTH, MEETING, MEMORIAL, SLUICE},
     path::Distances,
     walk::{Walk, STEP_MS},
     world_map::{Region, WorldMap},
 };
+
+mod save;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Key {
@@ -46,7 +50,7 @@ impl Key {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(usize)]
 pub(crate) enum Facing {
     #[default]
@@ -93,15 +97,47 @@ pub enum Enemy {
     Slime,
     Bat,
     Echo,
+    FortEcho,
+    AbyssLord,
     Beast(Beast),
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Tactic {
+    Ordinary,
+    Shell,
+    Charge,
+}
+
 impl Enemy {
+    pub(crate) fn tactic(self) -> Tactic {
+        match self {
+            Self::FortEcho | Self::AbyssLord => Tactic::Charge,
+            Self::Beast(Beast(species)) => match (species.region, species.index) {
+                (Region::Nox, 12) | (Region::Liberta, 14) => Tactic::Shell,
+                (Region::Celestia, 14) | (Region::Vulcan, 10) => Tactic::Charge,
+                _ => Tactic::Ordinary,
+            },
+            _ => Tactic::Ordinary,
+        }
+    }
+
+    fn charge_damage(self) -> u8 {
+        self.damage()
+            + if matches!(self, Self::FortEcho | Self::AbyssLord) {
+                6
+            } else {
+                4
+            }
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             Self::Slime => "霧のスライム",
             Self::Bat => "洞窟コウモリ",
             Self::Echo => "忘却の獣",
+            Self::FortEcho => "砦の霧守",
+            Self::AbyssLord => "アビス・ロード",
             Self::Beast(beast) => beast.0.name(),
         }
     }
@@ -111,6 +147,8 @@ impl Enemy {
             Self::Slime => 12,
             Self::Bat => 16,
             Self::Echo => 34,
+            Self::FortEcho => 38,
+            Self::AbyssLord => 48,
             Self::Beast(beast) => beast.0.combat().0,
         }
     }
@@ -120,6 +158,8 @@ impl Enemy {
             Self::Slime => 3,
             Self::Bat => 4,
             Self::Echo => 6,
+            Self::FortEcho => 4,
+            Self::AbyssLord => 5,
             Self::Beast(beast) => beast.0.combat().1,
         }
     }
@@ -134,11 +174,13 @@ pub struct Battle {
     pub log: Option<[String; 2]>,
     island: Option<IslandBattle>,
     lesson: Option<(Lesson, usize)>,
+    story: Option<(Scene, u8)>,
+    pub(crate) charged: bool,
 }
 
 impl Battle {
     pub(crate) fn expedition(&self) -> bool {
-        self.island.is_some()
+        self.island.is_some() || self.story.is_some()
     }
 
     fn new(enemy: Enemy) -> Self {
@@ -149,6 +191,8 @@ impl Battle {
             log: None,
             island: None,
             lesson: None,
+            story: None,
+            charged: false,
         }
     }
 }
@@ -158,7 +202,6 @@ struct IslandBattle {
     creature: usize,
     scene: Scene,
     hp: u8,
-    memories: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -169,6 +212,15 @@ pub enum Scene {
     Battle,
     Defeat,
     Ending,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum SoundCue {
+    Confirm = 1,
+    Hit,
+    Victory,
+    Chapter,
 }
 
 pub struct Game {
@@ -195,6 +247,10 @@ pub struct Game {
     pub(crate) goods: Goods,
     pub(crate) economy_menu: Option<Menu>,
     held_direction: Option<HeldDirection>,
+    continue_game: Option<Box<Game>>,
+    pub(crate) title_new_game: bool,
+    pub(crate) confirm_overwrite: bool,
+    sound: Option<SoundCue>,
 }
 
 struct HeldDirection {
@@ -229,6 +285,10 @@ impl Game {
             goods: Goods::new(),
             economy_menu: None,
             held_direction: None,
+            continue_game: None,
+            title_new_game: false,
+            confirm_overwrite: false,
+            sound: None,
         }
     }
 
@@ -254,7 +314,7 @@ impl Game {
     pub fn advance_traffic(&mut self, milliseconds: u32) -> bool {
         let animated = if self.map_open {
             if let Some(town) = &mut self.world_map.town {
-                town.walk.advance(milliseconds)
+                town.walk.advance(milliseconds) | town.advance_gathering(milliseconds)
             } else {
                 self.world_map
                     .island
@@ -274,8 +334,13 @@ impl Game {
             return false;
         }
         if self.map_open {
-            !self.world_map.campaign.reading
+            self.world_map.campaign.panel.is_none()
                 && self.world_map.island.is_some()
+                && self
+                    .world_map
+                    .fort
+                    .as_ref()
+                    .is_none_or(|fort| matches!(fort.panel, fort::Panel::Walk))
                 && self
                     .world_map
                     .town
@@ -372,7 +437,48 @@ impl Game {
         true
     }
 
+    pub fn take_sound(&mut self) -> Option<SoundCue> {
+        self.sound.take()
+    }
+
     pub fn input(&mut self, key: Key) {
+        let hp = self.hp;
+        let restoring = matches!(self.scene, Scene::Title | Scene::Debug);
+        let chapter = self.world_map.campaign.complete();
+        let finished = self.world_map.campaign.finished();
+        let pending_round = self
+            .battle
+            .as_ref()
+            .is_some_and(|battle| battle.log.is_some());
+        self.handle_input(key);
+        if key != Key::Confirm {
+            return;
+        }
+        self.sound = Some(
+            if !restoring
+                && ((!chapter && self.world_map.campaign.complete())
+                    || (!finished && self.world_map.campaign.finished()))
+            {
+                SoundCue::Chapter
+            } else if let Some(battle) = self
+                .battle
+                .as_ref()
+                .filter(|battle| !pending_round && battle.log.is_some())
+            {
+                if battle.hp == 0 {
+                    SoundCue::Victory
+                } else if self.hp < hp {
+                    SoundCue::Hit
+                } else {
+                    SoundCue::Confirm
+                }
+            } else {
+                SoundCue::Confirm
+            },
+        );
+    }
+
+    fn handle_input(&mut self, key: Key) {
         if self.economy_menu.is_some() {
             self.economy_input(key);
             return;
@@ -380,7 +486,7 @@ impl Game {
         if !self.map_open && matches!(self.scene, Scene::Debug) {
             let key = if key == Key::Map { Key::Back } else { key };
             match self.debug_menu.input(key) {
-                debug::Action::Title => *self = Self::new(),
+                debug::Action::Title => self.reset_to_title(),
                 debug::Action::Jump(target) => self.debug_jump(target),
                 debug::Action::Stay => {}
             }
@@ -394,7 +500,10 @@ impl Game {
             return;
         }
         if self.map_open {
-            if let Some(town) = &self.world_map.town {
+            if let Some(town) = &mut self.world_map.town {
+                if key == Key::Confirm && town.gather(&mut self.goods) {
+                    return;
+                }
                 let index = town.index;
                 let previous = self.world_map.town_progress[index];
                 let position = town.pos;
@@ -429,7 +538,35 @@ impl Game {
                 }
                 return;
             }
-            if self.world_map.chapter_input(key) {
+            if let Some(interior) = &mut self.world_map.fort {
+                let was = interior.pos;
+                let action = interior.input(key, self.world_map.campaign.fort_cleared);
+                if interior.pos != was {
+                    self.goods.walked();
+                }
+                match action {
+                    fort::Action::Leave => self.world_map.fort = None,
+                    fort::Action::Battle => self.start_story_battle(Enemy::FortEcho),
+                    fort::Action::Deliver { sail } => {
+                        self.world_map.fort = None;
+                        self.world_map.campaign.advance();
+                        if sail {
+                            self.world_map.island.as_mut().unwrap().return_to_harbor();
+                        }
+                    }
+                    fort::Action::Stay
+                        if key == Key::Journal && matches!(interior.panel, fort::Panel::Walk) =>
+                    {
+                        self.economy_menu = Some(Menu::new(Page::Bag));
+                    }
+                    fort::Action::Stay => {}
+                }
+                return;
+            }
+            if self.world_map.enter_fort(key) {
+                return;
+            }
+            if self.voyage_input(key) {
                 return;
             }
             if key == Key::Journal && self.world_map.island.is_some() {
@@ -462,7 +599,7 @@ impl Game {
             return;
         }
 
-        if key == Key::Map && self.can_open_map() {
+        if key == Key::Map && self.can_open_map() && !self.confirm_overwrite {
             self.title_code = 0;
             self.map_open = true;
             return;
@@ -476,13 +613,64 @@ impl Game {
         }
 
         match self.scene {
-            Scene::Title if key == Key::Confirm => self.start_prologue(),
+            Scene::Title => self.title_input(key),
             Scene::Field => self.field_input(key),
             Scene::Battle => self.battle_input(key),
             Scene::Ending if key == Key::Confirm => self.map_open = true,
-            Scene::Defeat if key == Key::Confirm => *self = Self::new(),
+            Scene::Defeat if key == Key::Confirm => self.reset_to_title(),
             _ => {}
         }
+    }
+
+    fn voyage_input(&mut self, key: Key) -> bool {
+        let Some(beat) = self.world_map.voyage_here() else {
+            return false;
+        };
+        let campaign = &mut self.world_map.campaign;
+        let Some(panel) = campaign.panel else {
+            if key == Key::Confirm {
+                campaign.panel = Some(VoyagePanel::Read);
+                return true;
+            }
+            return false;
+        };
+        match (panel, key) {
+            (_, Key::Back | Key::Map) => campaign.panel = None,
+            (VoyagePanel::Consent(selected), Key::Up | Key::Down) => {
+                campaign.panel = Some(VoyagePanel::Consent(1 - selected));
+            }
+            (VoyagePanel::Consent(selected), Key::Confirm) => {
+                campaign.panel = Some(VoyagePanel::Response(selected == 0));
+            }
+            (VoyagePanel::Read, Key::Confirm) if beat.consent() => {
+                campaign.panel = Some(VoyagePanel::Consent(0));
+            }
+            (VoyagePanel::Read, Key::Confirm) if beat.battle() => {
+                campaign.panel = None;
+                self.start_story_battle(Enemy::AbyssLord);
+            }
+            (VoyagePanel::Read | VoyagePanel::Response(_), Key::Confirm) => {
+                if let VoyagePanel::Response(sealed) = panel {
+                    campaign.sealed_names = sealed;
+                }
+                let previous_region = beat.region;
+                campaign.advance_voyage();
+                if beat.epilogue() {
+                    self.world_map.island = None;
+                    self.map_open = false;
+                    self.scene = Scene::Ending;
+                } else if let Some(next) = campaign.voyage() {
+                    if next.region != previous_region {
+                        self.world_map.selected = next.region;
+                        self.world_map.island = None;
+                    } else if next.battle() {
+                        self.goods.hp = MAX_HP;
+                    }
+                }
+            }
+            _ => {}
+        }
+        true
     }
 
     fn start_prologue(&mut self) {
@@ -496,7 +684,7 @@ impl Game {
     fn return_to_debug(&mut self) {
         let mut menu = std::mem::take(&mut self.debug_menu);
         menu.previewing = false;
-        *self = Self::new();
+        self.reset_to_title();
         self.scene = Scene::Debug;
         self.debug_menu = menu;
     }
@@ -836,7 +1024,6 @@ impl Game {
             creature,
             scene: self.scene,
             hp: self.hp,
-            memories: self.memories,
         });
         self.battle = Some(battle);
         self.hp = self.goods.hp;
@@ -859,8 +1046,36 @@ impl Game {
             self.goods.hp = self.hp;
         }
         self.hp = expedition.hp;
-        self.memories = expedition.memories;
         self.scene = expedition.scene;
+        self.map_open = true;
+        self.battle = None;
+    }
+
+    fn start_story_battle(&mut self, enemy: Enemy) {
+        let (scene, hp) = (self.scene, self.hp);
+        self.start_battle(enemy);
+        self.battle.as_mut().unwrap().story = Some((scene, hp));
+        self.hp = self.goods.hp;
+        self.map_open = false;
+    }
+
+    fn finish_story_battle(&mut self, scene: Scene, hp: u8) {
+        if self.hp == 0 {
+            if let Some(fort) = &mut self.world_map.fort {
+                fort.pos = fort::ENTRY;
+                fort.panel = fort::Panel::Recovered;
+            }
+            self.goods.hp = MAX_HP;
+        } else {
+            if self.world_map.fort.is_some() {
+                self.world_map.campaign.fort_cleared = true;
+            } else {
+                self.world_map.campaign.advance_voyage();
+            }
+            self.goods.hp = self.hp;
+        }
+        self.hp = hp;
+        self.scene = scene;
         self.map_open = true;
         self.battle = None;
     }
@@ -875,6 +1090,14 @@ impl Game {
             if let Some(expedition) = battle.island {
                 if self.hp == 0 || battle.hp == 0 {
                     self.finish_island_battle(expedition);
+                } else {
+                    battle.log = None;
+                }
+                return;
+            }
+            if let Some((scene, hp)) = battle.story {
+                if self.hp == 0 || battle.hp == 0 {
+                    self.finish_story_battle(scene, hp);
                 } else {
                     battle.log = None;
                 }
@@ -908,11 +1131,14 @@ impl Game {
                 self.economy_menu = Some(Menu::new(Page::Battle));
             }
             Key::Confirm => {
-                let attack = if battle.expedition() {
+                let mut attack = if battle.expedition() {
                     self.goods.attack()
                 } else {
                     6
                 };
+                if battle.enemy.tactic() == Tactic::Shell {
+                    attack = attack.saturating_sub(3).max(1);
+                }
                 let (damage, incoming, description) = match battle.selected {
                     0 => (attack, battle.enemy.damage(), "アレンの攻撃！".into()),
                     1 if self.memories > 0 => {
@@ -945,14 +1171,38 @@ impl Game {
                 format!("{}を倒した！", battle.enemy.name())
             }
         } else {
-            let incoming = if battle.expedition() {
+            let mut incoming = if battle.expedition() {
                 incoming.saturating_sub(self.goods.defense()).max(1)
             } else {
                 incoming
             };
+            let mut interrupted = false;
+            if battle.enemy.tactic() == Tactic::Charge {
+                if battle.charged {
+                    match battle.selected {
+                        2 => {
+                            incoming = 0;
+                            interrupted = true;
+                        }
+                        3 => incoming = 1,
+                        _ => {
+                            incoming = battle
+                                .enemy
+                                .charge_damage()
+                                .saturating_sub(self.goods.defense())
+                                .max(1)
+                        }
+                    }
+                }
+                battle.charged = !battle.charged;
+            }
             self.hp = self.hp.saturating_sub(incoming);
-            if self.hp == 0 && battle.expedition() {
+            if self.hp == 0 && battle.enemy == Enemy::FortEcho {
+                "アレンは倒れた。決定で砦の入口へ戻る。".into()
+            } else if self.hp == 0 && battle.expedition() {
                 "アレンは倒れた。決定で港へ戻る。".into()
+            } else if interrupted {
+                "リリスの共鳴が敵の大技を封じた！".into()
             } else {
                 format!(
                     "{}の反撃。アレンは {} のダメージ。",
@@ -1028,15 +1278,65 @@ mod tests {
         }
     }
 
+    fn walk_to(game: &mut Game, goal: crate::island::Position) -> usize {
+        use crate::island::{HEIGHT, WIDTH};
+        let position = |game: &Game| {
+            if let Some(fort) = &game.world_map.fort {
+                fort.pos
+            } else if let Some(town) = &game.world_map.town {
+                town.pos
+            } else {
+                let island = game.world_map.island.as_ref().unwrap();
+                (island.x, island.y)
+            }
+        };
+        let route = if let Some(fort) = &game.world_map.fort {
+            Distances::new((13, 7), goal, |at| fort.walkable(at))
+        } else if let Some(town) = &game.world_map.town {
+            Distances::new((WIDTH, HEIGHT), goal, |at| town.landscape.walkable(at))
+        } else {
+            let island = game.world_map.island.as_ref().unwrap();
+            Distances::new((WIDTH, HEIGHT), goal, |(x, y)| island.tile(x, y).walkable())
+        };
+        let expected = route.get(position(game));
+        assert_ne!(expected, crate::path::UNREACHABLE, "route to {goal:?}");
+        for remaining in (1..=expected).rev() {
+            let (x, y) = position(game);
+            let key = [Key::Up, Key::Down, Key::Left, Key::Right]
+                .into_iter()
+                .find(|key| {
+                    let (dx, dy) = key.direction().unwrap();
+                    route.get((x + dx, y + dy)) == remaining - 1
+                })
+                .unwrap();
+            game.input(key);
+            assert_eq!(route.get(position(game)), remaining - 1);
+        }
+        usize::from(expected)
+    }
+
+    fn win_story_battle(game: &mut Game, expected: Enemy) {
+        assert_eq!(game.battle.as_ref().unwrap().enemy, expected);
+        for _ in 0..10 {
+            let Some(battle) = &game.battle else {
+                return;
+            };
+            assert_ne!(game.hp, 0);
+            let target = if battle.charged { 2 } else { 0 };
+            while game.battle.as_ref().unwrap().selected != target {
+                game.input(Key::Down);
+            }
+            press(game, &[Key::Confirm, Key::Confirm]);
+        }
+        panic!("battle did not end");
+    }
+
     #[test]
     fn nox_services_collect_brew_craft_equip_and_trade() {
-        use crate::{
-            economy::{Item, Service},
-            town::Action,
-        };
+        use crate::{economy::Item, town::Action};
         use Key::*;
 
-        fn visit(game: &mut Game, town: usize, place: usize) {
+        fn enter(game: &mut Game, town: usize) {
             game.map_open = true;
             game.world_map.selected = Region::Nox;
             if game.world_map.island.is_none() {
@@ -1045,6 +1345,10 @@ mod tests {
             let island = game.world_map.island.as_mut().unwrap();
             (island.x, island.y) = island.settlements()[town].door;
             game.input(Confirm);
+        }
+
+        fn visit(game: &mut Game, town: usize, place: usize) {
+            enter(game, town);
             let map = game.world_map.town.as_mut().unwrap();
             map.pos = map.plan().places[place].at;
             let row = map
@@ -1059,13 +1363,37 @@ mod tests {
             assert!(game.economy_menu.is_some());
         }
 
+        fn collect(game: &mut Game, item: Item) {
+            let map = game.world_map.town.as_mut().unwrap();
+            let spot = map
+                .gathering_spots()
+                .iter()
+                .find(|spot| spot.item == item)
+                .unwrap();
+            map.pos = (spot.at.0, spot.at.1 - 1);
+            game.input(Confirm);
+            assert!(game.economy_menu.is_none());
+            let gathering = game
+                .world_map
+                .town
+                .as_ref()
+                .unwrap()
+                .gathering
+                .as_ref()
+                .unwrap();
+            assert_eq!(gathering.spot.item, item);
+            assert!(gathering.result.is_ok());
+        }
+
         let mut game = Game::new();
-        visit(&mut game, 0, 3);
-        press(&mut game, &[Confirm, Confirm, Down, Confirm]);
+        enter(&mut game, 0);
+        collect(&mut game, Item::AshHerb);
+        game.input(Confirm);
+        collect(&mut game, Item::AshWood);
         assert_eq!(game.goods.count(Item::AshHerb), 3);
         assert_eq!(game.goods.count(Item::AshWood), 2);
         assert!(game.goods.gather_wait(Item::AshHerb) > 0);
-        press(&mut game, &[Back, Back, Map]);
+        game.input(Back);
 
         visit(&mut game, 0, 7);
         game.input(Confirm);
@@ -1080,10 +1408,9 @@ mod tests {
         assert_eq!(game.goods.count(Item::AshWood), 2);
         press(&mut game, &[Back, Back, Map]);
 
-        visit(&mut game, 5, 3);
-        assert!(matches!(Service::at(5, 3), Some(Service::Gather(_))));
-        game.input(Confirm);
-        press(&mut game, &[Back, Back, Map]);
+        enter(&mut game, 5);
+        collect(&mut game, Item::BogIron);
+        game.input(Back);
         visit(&mut game, 5, 1);
         press(&mut game, &[Confirm, Confirm]);
         assert_eq!(game.goods.coins, 6);
@@ -1213,8 +1540,7 @@ mod tests {
         assert!(game.message.unwrap().lines[0].contains("さっき笛を吹いた"));
     }
 
-    #[test]
-    fn tutorial_earns_liliths_company_then_opens_nox() {
+    fn through_prologue() -> Game {
         use Key::*;
         let mut game = Game::new();
         press(&mut game, &[Confirm, Confirm]);
@@ -1281,24 +1607,19 @@ mod tests {
             game.world_map.campaign.beat().unwrap().title,
             "途切れた帰還記録"
         );
+        game
+    }
+
+    #[test]
+    fn tutorial_earns_liliths_company_then_opens_nox() {
+        through_prologue();
     }
 
     #[test]
     fn nox_chapter_connects_towns_and_the_ruin_to_the_next_voyage() {
         use Key::*;
-        let mut game = Game::new();
-        game.world_map.begin_nox();
-        game.map_open = true;
-        if let Some(town) = &game.world_map.town {
-            assert_eq!(town.index, 0);
-        }
-        game.scene = Scene::Field;
-        game.intro = Intro::Nox;
-        press(&mut game, &[Map, Map, Back]);
-        assert!(!game.map_open);
-        assert!(game.world_map.island.is_none());
-        assert_eq!(game.world_map.campaign.beat().unwrap().site, 0);
-        press(&mut game, &[Map, Confirm]);
+        let mut game = through_prologue();
+        let mut nox_steps = 0;
         for (index, place) in [
             (0, Some(1)),
             (1, Some(3)),
@@ -1309,12 +1630,14 @@ mod tests {
         ] {
             let step = game.world_map.campaign.beat().unwrap();
             assert_eq!((step.site, step.place), (index, place));
-            let island = game.world_map.island.as_mut().unwrap();
-            (island.x, island.y) = island.settlements()[index].door;
-            game.input(Confirm);
+            if game.world_map.town.is_none() {
+                let door = game.world_map.island.as_ref().unwrap().settlements()[index].door;
+                nox_steps += walk_to(&mut game, door);
+                game.input(Confirm);
+            }
             if let Some(place) = place {
-                let town = game.world_map.town.as_mut().unwrap();
-                town.pos = town.plan().places[place].at;
+                let destination = game.world_map.town.as_ref().unwrap().plan().places[place].at;
+                nox_steps += walk_to(&mut game, destination);
                 press(&mut game, &[Confirm, Confirm]);
                 assert!(matches!(
                     game.world_map.town.as_ref().unwrap().panel,
@@ -1328,16 +1651,69 @@ mod tests {
                     game.input(Map);
                 }
             } else {
-                assert!(game.world_map.campaign.reading);
+                assert!(game.world_map.fort.is_some());
                 game.input(Back);
                 assert_eq!(game.world_map.campaign.beat().unwrap().site, 12);
-                press(&mut game, &[Confirm, Confirm]);
+                game.input(Confirm);
+                nox_steps += walk_to(&mut game, (2, 5));
+                press(&mut game, &[Confirm, Confirm, Confirm]);
+                assert!(!game.world_map.fort.as_ref().unwrap().gate);
+                press(&mut game, &[Confirm, Down, Down, Confirm, Confirm]);
+                nox_steps += walk_to(&mut game, (8, 3));
+                game.input(Confirm);
+                for _ in 0..4 {
+                    press(&mut game, &[Confirm, Confirm]);
+                }
+                assert!(game.battle.is_none());
+                assert_eq!(game.goods.hp, MAX_HP);
+                assert!(game.world_map.fort.as_ref().unwrap().gate);
+                assert!(!game.world_map.campaign.fort_cleared);
+                game.input(Confirm);
+                walk_to(&mut game, (8, 3));
+                game.input(Confirm);
+                win_story_battle(&mut game, Enemy::FortEcho);
+                assert!(game.world_map.campaign.fort_cleared);
+                nox_steps += walk_to(&mut game, (8, 1));
+                press(&mut game, &[Confirm, Confirm, Confirm]);
             }
         }
         assert!(matches!(game.scene, Scene::Ending));
+        eprintln!("Nox chapter shortest walk via normal controls: {nox_steps} steps");
+        let mut resumed = Game::new();
+        assert!(resumed.offer_continue(&game.checkpoint().unwrap()));
+        resumed.input(Confirm);
+        assert!(matches!(resumed.scene, Scene::Ending));
+        assert!(resumed.world_map.campaign.complete());
+        let mut game = resumed;
         game.input(Confirm);
         assert!(game.map_open);
         assert_eq!(game.world_map.selected, Region::Celestia);
+        game.input(Confirm);
+        while let Some(beat) = game.world_map.campaign.voyage() {
+            if game.world_map.island.is_none() {
+                assert_eq!(game.world_map.selected, beat.region);
+                game.input(Confirm);
+            }
+            let island = game.world_map.island.as_ref().unwrap();
+            assert_eq!(island.region, beat.region);
+            let door = island.settlements()[beat.site].door;
+            walk_to(&mut game, door);
+            press(&mut game, &[Confirm, Confirm]);
+            if beat.consent() {
+                press(&mut game, &[Confirm, Confirm]);
+                assert!(game.world_map.campaign.sealed_names);
+            } else if beat.battle() {
+                win_story_battle(&mut game, Enemy::AbyssLord);
+            }
+        }
+        assert!(matches!(game.scene, Scene::Ending));
+        assert!(game.world_map.campaign.finished());
+        let mut frame = crate::render::Frame::new();
+        frame.draw(&game);
+        assert!(frame
+            .labels
+            .iter()
+            .any(|label| label.text == "残響のアルカディア　完"));
     }
 
     #[test]
@@ -1364,14 +1740,12 @@ mod tests {
         assert!(game.battle.is_none());
         press(&mut game, &[Confirm]);
         assert_eq!(game.battle.as_ref().unwrap().enemy, wolf);
-        for _ in 0..3 {
-            press(&mut game, &[Confirm, Confirm]);
-        }
+        press(&mut game, &[Down, Confirm, Confirm, Up, Confirm, Confirm]);
         let island = game.world_map.island.as_ref().unwrap();
         assert_eq!((island.x, island.y), position);
         assert!(!island.fauna.creatures()[id].active);
         assert!(matches!(game.scene, Scene::Title) && game.map_open);
-        assert_eq!((game.hp, game.memories), (11, 1));
+        assert_eq!((game.hp, game.memories), (11, 0));
     }
 
     #[test]

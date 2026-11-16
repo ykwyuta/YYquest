@@ -1,4 +1,8 @@
 use crate::dialogue::{Delivery, Expression::*, Speaker::*};
+use crate::world_map::Region;
+
+mod voyage;
+pub(crate) use voyage::{VoyageBeat, VoyagePanel};
 
 #[derive(Clone, Copy)]
 pub(crate) struct ChapterBeat {
@@ -27,7 +31,7 @@ const CHAPTER: [ChapterBeat; 6] = [
     },
     ChapterBeat {
         site: 7, place: Some(3), title: "二つの旗、ひとつの門",
-        text: "そうだ、救助船の出航を許したのは私だ。だが禁呪のせいで、助けた人々の名をどうしても思い出せない。この鍵を持って天墜ち砦へ向かい、残る記録を見てきてくれ。助かった人の名は家族だけに、生存の知らせは門前に掲げてほしい。",
+        text: "救助船の出航を許したのは私だ。この鍵と拓本を持って天墜ち砦へ。奥で記録を探してくれ。霧が濃い。傷薬が要るなら港の商いか、灰灯りの村の炊事場を頼るといい。",
         delivery: Delivery::spoken("バルド", Baldo, Sad),
     },
     ChapterBeat {
@@ -42,16 +46,28 @@ const CHAPTER: [ChapterBeat; 6] = [
     },
 ];
 
-#[derive(Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Campaign {
     next: Option<usize>,
-    pub reading: bool,
+    pub fort_cleared: bool,
+    voyage: usize,
+    pub sealed_names: bool,
+    #[serde(skip)]
+    pub panel: Option<VoyagePanel>,
 }
 
 impl Campaign {
+    pub(crate) fn valid(&self) -> bool {
+        self.next.is_none_or(|index| index <= CHAPTER.len())
+            && self.voyage <= voyage::STEPS.len()
+            && (self.voyage == 0 || self.complete())
+    }
+
     pub(crate) fn start(&mut self) {
-        self.next = Some(0);
-        self.reading = false;
+        *self = Self {
+            next: Some(0),
+            ..Self::default()
+        };
     }
 
     pub(crate) fn beat(&self) -> Option<&'static ChapterBeat> {
@@ -62,10 +78,26 @@ impl Campaign {
         if self.beat().is_some() {
             self.next = self.next.map(|index| index + 1);
         }
-        self.reading = false;
     }
 
     pub(crate) fn complete(&self) -> bool {
         self.next == Some(CHAPTER.len())
+    }
+
+    pub(crate) fn voyage(&self) -> Option<&'static VoyageBeat> {
+        self.complete()
+            .then(|| voyage::STEPS.get(self.voyage))
+            .flatten()
+    }
+
+    pub(crate) fn advance_voyage(&mut self) {
+        if self.voyage().is_some() {
+            self.voyage += 1;
+        }
+        self.panel = None;
+    }
+
+    pub(crate) fn finished(&self) -> bool {
+        self.voyage == voyage::STEPS.len()
     }
 }

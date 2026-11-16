@@ -124,11 +124,43 @@ fn main() {
         }
     }
     fs::write(out.join("dialogue-faces.rgba"), faces).unwrap();
+    let mut icons = Vec::new();
+    // Keep the packed artwork in Item's discriminant order.
+    for name in [
+        "rusty-sword",
+        "ash-herb",
+        "bitter-root",
+        "bog-iron",
+        "ash-wood",
+        "beast-hide",
+        "echo-shard",
+        "poultice",
+        "tonic",
+        "spark-tube",
+        "iron-sword",
+        "echo-blade",
+        "leather-coat",
+        "riveted-coat",
+        "mist-charm",
+    ] {
+        let icon = load(&format!("assets/items/{name}.png"));
+        icons.extend(fit_sprite(&icon, name, art_sizes::ITEM).into_raw());
+    }
+    fs::write(out.join("items.rgba"), icons).unwrap();
     for (name, path) in [
         ("slime", "assets/slime.png"),
         ("bat", "assets/bat.png"),
         ("echo", "assets/echo.png"),
     ] {
         export(&load(path), name, art_sizes::PORTRAIT, &out);
+    }
+    let app_icon = load("assets/app-icon.png");
+    for side in [16_u32, 32] {
+        let resized = imageops::resize(&app_icon, side, side, imageops::FilterType::Lanczos3);
+        let bgra: Vec<u8> = resized
+            .pixels()
+            .flat_map(|p| [p[2], p[1], p[0], p[3]])
+            .collect();
+        fs::write(out.join(format!("app-icon-{side}.bgra")), bgra).unwrap();
     }
 }

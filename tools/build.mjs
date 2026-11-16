@@ -16,7 +16,7 @@ if (cargo.status !== 0) process.exit(cargo.status || 1);
 
 const dist = new URL("dist/", root);
 mkdirSync(dist, { recursive: true });
-for (const name of ["index.html", "main.js", "game.css", "_headers"]) {
+for (const name of ["index.html", "main.js", "game.css", "_headers", "favicon.ico", "icon.png", "apple-touch-icon.png"]) {
   copyFileSync(new URL(`web/${name}`, root), new URL(name, dist));
 }
 copyFileSync(

@@ -1,19 +1,21 @@
 use super::{
     allen,
+    economy::item_icon,
     guide::{Area, Guidance},
     map_art::{self as art, Ground},
     view::{View, ROWS, TILE_SIZE, TOP, ZOOM},
     Frame, GOLD, INK, IVORY, LINE, MINT, MIST,
 };
 use crate::{
+    economy::{Goods, Item},
     island::Position,
     noise,
-    town::{Action, Followup, Panel, State, Surface, Town, HEIGHT, WIDTH},
+    town::{Action, Followup, Gathering, Panel, State, Surface, Town, HEIGHT, WIDTH},
     world_map::Region,
 };
 
 impl Frame {
-    pub(super) fn draw_town(&mut self, town: &Town, states: &[State; 5]) {
+    pub(super) fn draw_town(&mut self, town: &Town, states: &[State; 5], goods: &Goods) {
         let plan = town.plan();
         let view = View::following(self.width as i32, town.pos, (WIDTH, HEIGHT), &town.walk);
         let camera = view.camera;
@@ -152,6 +154,7 @@ impl Frame {
             self.rect(x + 1, y, 8, 1, GOLD);
         }
 
+        self.draw_gathering_spots(town, goods, view);
         self.draw_explorer(
             allen(town.facing, town.walk.pose()),
             view,
@@ -200,6 +203,14 @@ impl Frame {
                 if town.at_exit() {
                     self.label(24, 196, 11, GOLD, "島街道への出口");
                     self.label(24, 210, 10, IVORY, "決定で島フィールドに戻る");
+                } else if let Some(spot) = town.nearby_spot() {
+                    let wait = goods.gather_wait(spot.item);
+                    self.label(24, 196, 11, GOLD, spot.item.name());
+                    if wait == 0 {
+                        self.label(24, 210, 10, IVORY, spot.prompt());
+                    } else {
+                        self.label(24, 210, 10, MIST, format!("再び採れるまで {wait} 歩"));
+                    }
                 } else if let Some(index) = town.nearby() {
                     self.label(24, 196, 11, GOLD, plan.places[index].name);
                     self.label(24, 210, 10, IVORY, "決定で話す・調べる");
@@ -217,7 +228,13 @@ impl Frame {
                     self.label(24, 196, 11, GOLD, area);
                     self.label(24, 210, 10, IVORY, "街の施設や住民を訪ねよう");
                 }
-                if let Some((_, name)) = destination {
+                if let Some(gathering) = &town.gathering {
+                    let notice = match gathering.result {
+                        Ok(()) => gathering.spot.receipt(),
+                        Err(reason) => reason.into(),
+                    };
+                    self.label(24, 223, 9, MINT, notice);
+                } else if let Some((_, name)) = destination {
                     let mut route = format!("精霊　{name}へ");
                     if let Some(steps) = remaining {
                         if steps == 0 {
@@ -287,6 +304,38 @@ impl Frame {
                     self.label(24, 211, 9, MIST, "上下  選ぶ　　決定  選択");
                 } else {
                     self.label(24, 211, 9, MIST, "決定  進む　　M  閉じる");
+                }
+            }
+        }
+    }
+
+    fn draw_gathering_spots(&mut self, town: &Town, goods: &Goods, view: View) {
+        for spot in town.gathering_spots() {
+            let (x, y) = view.feet(spot.at);
+            let sprite = item_icon(spot.item);
+            if goods.gather_wait(spot.item) == 0 {
+                self.rect_clipped(x - 3, y, 7, 2, view.clip, INK);
+                self.rect_clipped(x - 1, y, 3, 1, view.clip, GOLD);
+                self.art_clipped(sprite, x - 12, y - 24, 24, view.clip);
+            } else if let Some(action) = town.gathering.as_ref().filter(|action| {
+                action.spot.at == spot.at
+                    && action.result.is_ok()
+                    && action.elapsed < Gathering::EFFECT_MS
+            }) {
+                let progress = action.elapsed as i32;
+                let size = 24 - progress / 19;
+                let lift = progress / 26;
+                self.art_clipped(
+                    sprite,
+                    x - size / 2,
+                    y - size - lift,
+                    size as usize,
+                    view.clip,
+                );
+                if spot.item == Item::AshHerb && progress < 160 {
+                    let sweep = progress / 19;
+                    self.rect_clipped(x - 9 + sweep, y - 8, 11, 1, view.clip, IVORY);
+                    self.rect_clipped(x - 5 + sweep, y - 9, 6, 1, view.clip, MINT);
                 }
             }
         }

@@ -1,38 +1,38 @@
 use super::{Frame, GOLD, INK, IVORY, LINE, MINT, MIST};
-use crate::world_map::{Region, WorldMap, MAP};
+use crate::{
+    campaign::{VoyageBeat, VoyagePanel},
+    dialogue::Delivery,
+    economy::Goods,
+    island::Island,
+    world_map::{Region, WorldMap, MAP},
+};
 
 const LEFT: i32 = 16;
 const TOP: i32 = 24;
 const CELL: i32 = 12;
 
 impl Frame {
-    pub(super) fn draw_world_map(&mut self, world: &WorldMap) {
+    pub(super) fn draw_world_map(&mut self, world: &WorldMap, goods: &Goods) {
         if let Some(town) = &world.town {
-            self.draw_town(town, &world.town_progress[town.index]);
+            self.draw_town(town, &world.town_progress[town.index], goods);
             return;
         }
         if let Some(island) = &world.island {
-            self.draw_island(island, world.guide_site(island));
-            if let Some(beat) = world.chapter_at_ruin() {
-                if world.campaign.reading {
-                    let width = (self.width as i32 - 20).min(344);
-                    let x = (self.width as i32 - width) / 2;
-                    self.panel(x, 38, width, 145);
-                    self.label(x + 11, 47, 12, GOLD, beat.title);
-                    self.dialogue_content((x + 11, 65), width - 22, &[beat.text], beat.delivery);
-                }
-                self.rect(122, 222, 96, 13, super::PANEL);
-                self.label(
-                    126,
-                    224,
-                    9,
-                    MINT,
-                    if world.campaign.reading {
-                        "決定　続ける"
-                    } else {
-                        "決定　今の目的"
-                    },
-                );
+            if let (Some(fort), Some(beat)) = (&world.fort, world.chapter_at_ruin()) {
+                self.draw_fort(fort, world.campaign.fort_cleared, beat);
+                return;
+            }
+            let voyage = world.voyage_here();
+            let action = if world.chapter_at_ruin().is_some() {
+                Some("決定　砦の中へ")
+            } else if voyage.is_some() {
+                Some("決定　本編イベント")
+            } else {
+                None
+            };
+            self.draw_island(island, world.guide_site(island), action);
+            if let Some(beat) = voyage {
+                self.draw_voyage(beat, world.campaign.panel, world.campaign.sealed_names);
             }
             return;
         }
@@ -71,8 +71,87 @@ impl Frame {
         self.panel(15, 207, 290, 30);
         let (location, detail) = world.selected.caption();
         self.label(23, 210, 11, GOLD, location);
-        self.label(23, 223, 10, IVORY, detail);
         self.label(205, 210, 9, MINT, "Enter / Z  上陸");
+        if let Some(beat) = world.campaign.voyage() {
+            let site = Island::settlement_definitions(beat.region)[beat.site]
+                .landmark
+                .name;
+            self.label(
+                23,
+                223,
+                9,
+                MINT,
+                format!("本編の目的地　{site}（{}）", beat.region.short_name()),
+            );
+        } else {
+            self.label(23, 223, 10, IVORY, detail);
+        }
+    }
+
+    fn draw_voyage(&mut self, beat: &VoyageBeat, panel: Option<VoyagePanel>, sealed: bool) {
+        let Some(panel) = panel else {
+            return;
+        };
+        let width = (self.width as i32 - 20).min(344);
+        let x = (self.width as i32 - width) / 2;
+        if beat.battle() || beat.epilogue() {
+            self.labels.clear();
+            self.landscape(0, 0, self.width as i32, 240);
+            self.label(x + 8, 9, 9, MIST, "虚無の海　調律の祭壇");
+        }
+        self.panel(x, 30, width, 158);
+        self.label(x + 10, 40, 12, GOLD, beat.title);
+        match panel {
+            VoyagePanel::Read => {
+                self.dialogue_content((x + 10, 59), width - 20, &[beat.text], beat.delivery());
+                if beat.epilogue() && sealed {
+                    self.label(
+                        x + 10,
+                        148,
+                        9,
+                        MINT,
+                        "家族宛ての封書は、聖堂に預けたままにした。",
+                    );
+                }
+            }
+            VoyagePanel::Consent(selected) => {
+                for (index, choice) in ["家族だけに宛てた封書を作る", "名を伏せたまま証言を預かる"]
+                    .into_iter()
+                    .enumerate()
+                {
+                    let marker = if index == selected { "▶" } else { "　" };
+                    self.label(
+                        x + 10,
+                        69 + 23 * index as i32,
+                        11,
+                        IVORY,
+                        format!("{marker} {choice}"),
+                    );
+                }
+            }
+            VoyagePanel::Response(sealed) => {
+                let response = if sealed {
+                    "ミナは家族にだけ見せる封書を預かった。公の写しからは名を除いた。"
+                } else {
+                    "ミナは名を伏せた証言だけを写し、本人に控えを返した。"
+                };
+                self.dialogue_content(
+                    (x + 10, 59),
+                    width - 20,
+                    &[
+                        response,
+                        "カインは、次の手がかりを求めてリベルタの潮待ちの港町へ向かうよう勧めた。",
+                    ],
+                    Delivery::Scene,
+                );
+            }
+        }
+        let action = if beat.battle() {
+            "決定　封印を守る"
+        } else {
+            "▼ 決定"
+        };
+        self.label(x + width - 95, 166, 9, GOLD, action);
     }
 
     fn world_tile(&mut self, col: i32, row: i32, tile: u8) {

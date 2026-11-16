@@ -4,6 +4,7 @@ use crate::{
     island::Position,
     path::{Distances, DIRECTIONS, UNREACHABLE},
     town::State,
+    world_map::Region,
 };
 
 const SPIRIT: Sprite = Sprite::new(
@@ -14,7 +15,7 @@ const SPIRIT: Sprite = Sprite::new(
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Area {
     Prologue,
-    Nox,
+    Island(Region),
     Town {
         index: usize,
         low_tide: bool,

@@ -37,6 +37,18 @@ fn every_nox_place_is_reachable_from_the_island_entrance() {
         for place in &plan.places {
             assert!(seen[address(place.at)], "{} / {}", plan.name, place.name);
         }
+        for spot in town.gathering_spots() {
+            assert!(
+                seen[address(spot.at)],
+                "{} / {}",
+                plan.name,
+                spot.item.name()
+            );
+            assert!(plan
+                .places
+                .iter()
+                .all(|place| distance(spot.at, place.at) > 3));
+        }
     }
 }
 
