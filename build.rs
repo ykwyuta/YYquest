@@ -4,7 +4,8 @@ use std::{env, fs, path::PathBuf};
 #[path = "build/map_art.rs"]
 mod map_art;
 
-const SIZE: u32 = 64;
+#[path = "src/art_sizes.rs"]
+mod art_sizes;
 
 fn load(path: &str) -> RgbaImage {
     println!("cargo:rerun-if-changed={path}");
@@ -13,19 +14,20 @@ fn load(path: &str) -> RgbaImage {
         .into_rgba8()
 }
 
-fn export(image: &RgbaImage, name: &str, out: &std::path::Path) {
+fn export(image: &RgbaImage, name: &str, side: usize, out: &std::path::Path) {
     fs::write(
         out.join(format!("{name}.rgba")),
-        fit_sprite(image, name).into_raw(),
+        fit_sprite(image, name, side).into_raw(),
     )
     .unwrap();
 }
 
-fn fit_sprite(image: &RgbaImage, name: &str) -> RgbaImage {
+fn fit_sprite(image: &RgbaImage, name: &str, side: usize) -> RgbaImage {
+    let side = side as u32;
     let (mut left, mut top) = (image.width(), image.height());
     let (mut right, mut bottom) = (0, 0);
     for (x, y, pixel) in image.enumerate_pixels() {
-        if pixel[3] >= 128 {
+        if pixel[3] >= 16 {
             left = left.min(x);
             top = top.min(y);
             right = right.max(x + 1);
@@ -33,17 +35,29 @@ fn fit_sprite(image: &RgbaImage, name: &str) -> RgbaImage {
         }
     }
     assert!(right > left && bottom > top, "{name} has no visible pixels");
-    let crop = imageops::crop_imm(image, left, top, right - left, bottom - top).to_image();
-    let longest_edge = crop.width().max(crop.height());
-    let width = (crop.width() * SIZE / longest_edge).max(1);
-    let height = (crop.height() * SIZE / longest_edge).max(1);
-    let sprite = imageops::resize(&crop, width, height, imageops::FilterType::Nearest);
-    let mut cell = RgbaImage::new(SIZE, SIZE);
+    let mut crop = imageops::crop_imm(image, left, top, right - left, bottom - top).to_image();
+    for pixel in crop.pixels_mut() {
+        let alpha = u32::from(pixel[3]);
+        for channel in &mut pixel.0[..3] {
+            *channel = ((u32::from(*channel) * alpha + 127) / 255) as u8;
+        }
+    }
+    let longest = crop.width().max(crop.height());
+    let width = ((crop.width() * side + longest / 2) / longest).max(1);
+    let height = ((crop.height() * side + longest / 2) / longest).max(1);
+    let mut sprite = imageops::resize(&crop, width, height, imageops::FilterType::Lanczos3);
+    for pixel in sprite.pixels_mut() {
+        let alpha = pixel[3];
+        for channel in &mut pixel.0[..3] {
+            *channel = (*channel).min(alpha);
+        }
+    }
+    let mut cell = RgbaImage::new(side, side);
     imageops::replace(
         &mut cell,
         &sprite,
-        i64::from((SIZE - width) / 2),
-        i64::from(SIZE - height),
+        i64::from((side - width) / 2),
+        i64::from(side - height),
     );
     cell
 }
@@ -55,13 +69,13 @@ fn main() {
     let half = heroes.width() / 2;
     for (name, offset) in [("allen", 0), ("lilith", half)] {
         let cell = imageops::crop_imm(&heroes, offset, 0, half, heroes.height()).to_image();
-        export(&cell, name, &out);
+        export(&cell, name, art_sizes::PORTRAIT, &out);
     }
     for (name, path) in [
         ("slime", "assets/slime.png"),
         ("bat", "assets/bat.png"),
         ("echo", "assets/echo.png"),
     ] {
-        export(&load(path), name, &out);
+        export(&load(path), name, art_sizes::PORTRAIT, &out);
     }
 }

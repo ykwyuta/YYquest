@@ -8,10 +8,12 @@ let labels = [];
 let center = 0;
 const { instance } = await WebAssembly.instantiate(binary, {
   screen: {
-    bitmap(address) {
+    bitmap(address, width, height) {
+      assert.equal(width, 640);
+      assert.equal(height, 480);
       labels = [];
-      const pixels = new Uint32Array(wasm.memory.buffer, address, 320 * 240);
-      center = pixels[100 * 320 + 160];
+      const pixels = new Uint32Array(wasm.memory.buffer, address, width * height);
+      center = pixels[200 * width + width / 2];
     },
     text(_x, _y, _size, _color, address, length) {
       labels.push(decoder.decode(new Uint8Array(wasm.memory.buffer, address, length)));
@@ -51,7 +53,23 @@ assert.equal(wasm.animate_traffic(70), 1);
 press(right, right, right, ...Array(32).fill(up), left, left, left);
 has("灰灯りの村");
 has("街・村");
-press(escape, right, enter);
+press(enter);
+has("島街道への出口");
+press(journal);
+has("街の手記");
+has("炉の名札");
+has("灰の中の晩餐");
+press(journal, ...Array(4).fill(left), ...Array(74).fill(up));
+has("共同炉");
+press(enter, enter);
+has("警備隊が避難者の名前");
+press(enter);
+has("冬越し小屋へ");
+press(escape);
+has("街・村");
+press(enter);
+has("冬越し小屋へ");
+press(escape, escape, right, enter);
 has("黒鉄港町");
 press(enter);
 has("虚無の海");
@@ -94,4 +112,23 @@ has("残った記憶  2/3");
 press(enter, left);
 assert.equal(wasm.is_title(), 1);
 has("残響のアルカディア");
-console.log("Wasm smoke passed (title, encounter, journal, companion, ending)");
+// Open the debug menu via the directional pad, then jump to a town and a story.
+press(up, up, down, down, left, right, left, right);
+assert.equal(wasm.is_title(), 1);
+press(enter);
+has("デバッグモード");
+assert.equal(wasm.debug_back_control(), 1);
+press(enter, down, down, down, enter, enter);
+has("灰灯りの村");
+has("島街道への出口");
+press(escape, escape, escape);
+has("デバッグモード");
+press(escape, escape, down, enter, enter, enter, down, enter);
+has("炉の名札");
+has("名札のない薪束");
+press(enter);
+has("寄合小屋へ");
+press(escape, escape, escape);
+has("デバッグモード");
+
+console.log("Wasm smoke passed (title, island, town story, encounter, journal, companion, ending, debug menu)");

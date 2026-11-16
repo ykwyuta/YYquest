@@ -7,12 +7,12 @@ use crate::{
     world_map::Region,
 };
 
-const LEFT: i32 = 16;
-const TOP: i32 = 22;
+pub(super) const LEFT: i32 = 16;
+pub(super) const TOP: i32 = 22;
 pub(super) const TILE_SIZE: i32 = 12;
-const COLUMNS: i32 = 24;
-const ROWS: i32 = 14;
-const VIEW: [i32; 4] = [
+pub(super) const COLUMNS: i32 = 24;
+pub(super) const ROWS: i32 = 14;
+pub(super) const VIEW: [i32; 4] = [
     LEFT,
     TOP,
     LEFT + COLUMNS * TILE_SIZE,
@@ -128,7 +128,11 @@ impl Frame {
             );
         }
         self.label(24, 224, 9, MIST, "矢印 / WASD  移動");
-        if site.is_some_and(|site| site.kind == Kind::Harbor) {
+        if island.region == Region::Nox
+            && site.is_some_and(|site| matches!(site.kind, Kind::Town | Kind::Harbor))
+        {
+            self.label(126, 224, 9, MINT, "Enter / Z  入る");
+        } else if site.is_some_and(|site| site.kind == Kind::Harbor) {
             self.label(126, 224, 9, MINT, "Enter / Z  出港");
         }
         self.label(

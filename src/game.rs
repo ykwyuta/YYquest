@@ -1,4 +1,7 @@
-use crate::world_map::WorldMap;
+use crate::{
+    debug::{self, Target},
+    world_map::{Region, WorldMap},
+};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Key {
@@ -27,7 +30,7 @@ impl Key {
         })
     }
 
-    fn direction(self) -> Option<(i32, i32)> {
+    pub(crate) fn direction(self) -> Option<(i32, i32)> {
         Some(match self {
             Self::Up => (0, -1),
             Self::Down => (0, 1),
@@ -127,6 +130,7 @@ struct IslandBattle {
 #[derive(Clone, Copy)]
 pub enum Scene {
     Title,
+    Debug,
     Field,
     Battle,
     Defeat,
@@ -146,6 +150,8 @@ pub struct Game {
     pub battle: Option<Battle>,
     pub(crate) map_open: bool,
     pub(crate) world_map: WorldMap,
+    pub(crate) debug_menu: debug::Menu,
+    title_code: usize,
     steps: u8,
     next_bat: bool,
 }
@@ -165,6 +171,8 @@ impl Game {
             battle: None,
             map_open: false,
             world_map: WorldMap::new(),
+            debug_menu: debug::Menu::default(),
+            title_code: 0,
             steps: 0,
             next_bat: false,
         }
@@ -186,7 +194,7 @@ impl Game {
     }
 
     pub fn advance_traffic(&mut self, milliseconds: u32) -> bool {
-        if !self.map_open {
+        if !self.map_open || self.world_map.town.is_some() {
             return false;
         }
         self.world_map
@@ -195,10 +203,68 @@ impl Game {
             .is_some_and(|island| island.advance(milliseconds))
     }
 
+    pub fn debug_back_control(&self) -> bool {
+        !self.map_open && (matches!(self.scene, Scene::Debug) || self.debug_menu.previewing)
+    }
+
+    pub fn input_code(&mut self, code: u32, repeat: bool) -> bool {
+        let Some(key) = Key::from_code(code) else {
+            return false;
+        };
+        let title = !self.map_open && matches!(self.scene, Scene::Title);
+        if repeat && (title || key.direction().is_none()) {
+            return false;
+        }
+        if title {
+            let sequence = debug::TITLE_CODE;
+            if key == Key::Confirm && self.title_code == sequence.len() {
+                self.title_code = 0;
+                self.scene = Scene::Debug;
+                return true;
+            }
+            self.title_code = if sequence.get(self.title_code) == Some(&code) {
+                self.title_code + 1
+            } else if code == sequence[0] {
+                if self.title_code == 2 {
+                    2
+                } else {
+                    1
+                }
+            } else {
+                0
+            };
+        }
+        self.input(key);
+        true
+    }
+
     pub fn input(&mut self, key: Key) {
+        if !self.map_open && matches!(self.scene, Scene::Debug) {
+            let key = if key == Key::Map { Key::Back } else { key };
+            match self.debug_menu.input(key) {
+                debug::Action::Title => *self = Self::new(),
+                debug::Action::Jump(target) => self.debug_jump(target),
+                debug::Action::Stay => {}
+            }
+            return;
+        }
+        if self.debug_back_control()
+            && (matches!(key, Key::Back | Key::Map)
+                || (key == Key::Confirm && matches!(self.scene, Scene::Ending | Scene::Defeat)))
+        {
+            self.return_to_debug();
+            return;
+        }
         if self.map_open {
+            if self.world_map.town.is_some() {
+                self.world_map.town_input(key);
+                return;
+            }
             if matches!(key, Key::Map | Key::Back) {
                 self.map_open = self.world_map.close_island();
+                if !self.map_open && self.debug_menu.previewing {
+                    self.return_to_debug();
+                }
             } else if key == Key::Confirm && !self.begin_island_battle() {
                 self.world_map.confirm();
             } else if let Some((dx, dy)) = key.direction() {
@@ -208,6 +274,7 @@ impl Game {
         }
 
         if key == Key::Map && self.can_open_map() {
+            self.title_code = 0;
             self.map_open = true;
             return;
         }
@@ -220,17 +287,82 @@ impl Game {
         }
 
         match self.scene {
-            Scene::Title if key == Key::Confirm => {
-                self.scene = Scene::Field;
-                self.message = Some([
-                    "新聖律歴30年、黄昏の辺境領ノクス。",
-                    "父の錆びた大剣が、森の奥を指している。",
-                ]);
-            }
+            Scene::Title if key == Key::Confirm => self.start_prologue(),
             Scene::Field => self.field_input(key),
             Scene::Battle => self.battle_input(key),
             Scene::Defeat | Scene::Ending if key == Key::Confirm => *self = Self::new(),
             _ => {}
+        }
+    }
+
+    fn start_prologue(&mut self) {
+        self.scene = Scene::Field;
+        self.message = Some([
+            "新聖律歴30年、黄昏の辺境領ノクス。",
+            "父の錆びた大剣が、森の奥を指している。",
+        ]);
+    }
+
+    fn return_to_debug(&mut self) {
+        let mut menu = std::mem::take(&mut self.debug_menu);
+        menu.previewing = false;
+        *self = Self::new();
+        self.scene = Scene::Debug;
+        self.debug_menu = menu;
+    }
+
+    fn debug_jump(&mut self, target: Target) {
+        self.return_to_debug();
+        self.debug_menu.previewing = true;
+        match target {
+            Target::Site(region, index) => self.debug_site(region, index),
+            Target::Story(town, story, beat) => {
+                self.debug_site(Region::Nox, town);
+                self.world_map.town.as_mut().unwrap().preview_story(
+                    &mut self.world_map.town_progress[town],
+                    story,
+                    beat,
+                );
+            }
+            Target::Prologue(event) => {
+                self.scene = Scene::Field;
+                match event {
+                    0 => self.start_prologue(),
+                    1 => {
+                        (self.x, self.y) = (4, 2);
+                        self.hp = 1;
+                        self.field_input(Key::Left);
+                    }
+                    2 => {
+                        (self.x, self.y) = (12, 6);
+                        self.field_input(Key::Right);
+                    }
+                    3 => {
+                        (self.x, self.y) = (13, 2);
+                        self.field_input(Key::Right);
+                    }
+                    4 => self.start_battle(Enemy::Slime),
+                    5 => self.start_battle(Enemy::Bat),
+                    6 => {
+                        (self.x, self.y) = (13, 2);
+                        self.lilith = true;
+                        self.field_input(Key::Right);
+                    }
+                    7 => self.scene = Scene::Ending,
+                    _ => unreachable!(),
+                }
+            }
+        }
+    }
+
+    fn debug_site(&mut self, region: Region, index: usize) {
+        self.map_open = true;
+        self.world_map.selected = region;
+        self.world_map.confirm();
+        let island = self.world_map.island.as_mut().unwrap();
+        (island.x, island.y) = island.settlements()[index].door;
+        if region == Region::Nox && index < crate::town::COUNT {
+            self.world_map.confirm();
         }
     }
 

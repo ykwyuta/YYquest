@@ -15,7 +15,6 @@ canvas {
   aspect-ratio: 4 / 3;
   background: #111524;
   outline: 1px solid #725971;
-  image-rendering: pixelated;
 }
 #status { margin: 16px 0 0; text-align: center; }
 #cache-refresh:not([hidden]) { display: block; margin: 14px 0 0 auto; }

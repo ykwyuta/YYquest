@@ -179,6 +179,10 @@ impl Island {
         self.tiles[terrain::address(x, y)]
     }
 
+    pub(crate) fn settlement_definitions(region: Region) -> &'static [Settlement; SETTLEMENTS] {
+        &maps::layout(region).settlements
+    }
+
     pub(crate) fn settlements(&self) -> &[Settlement; SETTLEMENTS] {
         &self.settlements
     }

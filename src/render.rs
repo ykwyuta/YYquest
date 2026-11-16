@@ -1,12 +1,21 @@
 use crate::game::{Enemy, Game, Scene, COMMANDS, MAX_HP, MEMORIES};
 
+mod debug;
 mod island;
 mod map_art;
+mod sprite;
+mod town;
 mod traffic;
 mod world_map;
 
+use crate::art_sizes;
+use sprite::Sprite;
+
 pub const WIDTH: usize = 320;
 pub const HEIGHT: usize = 240;
+pub(crate) const DISPLAY_SCALE: usize = 2;
+pub const BUFFER_WIDTH: usize = WIDTH * DISPLAY_SCALE;
+pub const BUFFER_HEIGHT: usize = HEIGHT * DISPLAY_SCALE;
 
 const NIGHT: u32 = 0x111524;
 const INK: u32 = 0x181524;
@@ -18,12 +27,26 @@ const MIST: u32 = 0xcab9ce;
 const MINT: u32 = 0x95d5b4;
 const RED: u32 = 0xf48b78;
 
-const ART_SIZE: usize = 64;
-const ALLEN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/allen.rgba"));
-const LILITH: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/lilith.rgba"));
-const SLIME: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/slime.rgba"));
-const BAT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/bat.rgba"));
-const ECHO: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/echo.rgba"));
+const ALLEN: Sprite = Sprite::new(
+    include_bytes!(concat!(env!("OUT_DIR"), "/allen.rgba")),
+    art_sizes::PORTRAIT,
+);
+const LILITH: Sprite = Sprite::new(
+    include_bytes!(concat!(env!("OUT_DIR"), "/lilith.rgba")),
+    art_sizes::PORTRAIT,
+);
+const SLIME: Sprite = Sprite::new(
+    include_bytes!(concat!(env!("OUT_DIR"), "/slime.rgba")),
+    art_sizes::PORTRAIT,
+);
+const BAT: Sprite = Sprite::new(
+    include_bytes!(concat!(env!("OUT_DIR"), "/bat.rgba")),
+    art_sizes::PORTRAIT,
+);
+const ECHO: Sprite = Sprite::new(
+    include_bytes!(concat!(env!("OUT_DIR"), "/echo.rgba")),
+    art_sizes::PORTRAIT,
+);
 
 pub struct Label {
     pub x: i32,
@@ -41,7 +64,7 @@ pub struct Frame {
 impl Frame {
     pub fn new() -> Self {
         Self {
-            pixels: vec![0; WIDTH * HEIGHT],
+            pixels: vec![0; BUFFER_WIDTH * BUFFER_HEIGHT],
             labels: Vec::new(),
         }
     }
@@ -51,8 +74,9 @@ impl Frame {
         let right = (x + w).clamp(0, WIDTH as i32) as usize;
         let top = y.clamp(0, HEIGHT as i32) as usize;
         let bottom = (y + h).clamp(0, HEIGHT as i32) as usize;
-        for row in top..bottom {
-            self.pixels[row * WIDTH + left..row * WIDTH + right].fill(color);
+        let (left, right) = (left * DISPLAY_SCALE, right * DISPLAY_SCALE);
+        for row in top * DISPLAY_SCALE..bottom * DISPLAY_SCALE {
+            self.pixels[row * BUFFER_WIDTH + left..row * BUFFER_WIDTH + right].fill(color);
         }
     }
 
@@ -72,34 +96,35 @@ impl Frame {
         self.rect(x + 2, y + 2, w - 4, h - 4, PANEL);
     }
 
-    fn art(&mut self, pixels: &[u8], x: i32, y: i32, size: usize) {
-        self.art_clipped(pixels, x, y, size, [0, 0, WIDTH as i32, HEIGHT as i32]);
+    fn art(&mut self, sprite: Sprite, x: i32, y: i32, size: usize) {
+        self.art_clipped(sprite, x, y, size, [0, 0, WIDTH as i32, HEIGHT as i32]);
     }
 
-    fn art_clipped(&mut self, pixels: &[u8], x: i32, y: i32, size: usize, clip: [i32; 4]) {
-        self.art_oriented(pixels, x, y, size, clip, false);
+    fn art_clipped(&mut self, sprite: Sprite, x: i32, y: i32, size: usize, clip: [i32; 4]) {
+        self.art_oriented(sprite, x, y, size, clip, false);
     }
 
     fn art_oriented(
         &mut self,
-        pixels: &[u8],
+        sprite: Sprite,
         x: i32,
         y: i32,
         size: usize,
         clip: [i32; 4],
         flip: bool,
     ) {
-        let [left, top, right, bottom] = clip;
-        for dy in y.max(top)..(y + size as i32).min(bottom) {
-            let row = (dy - y) as usize * ART_SIZE / size;
-            for dx in x.max(left)..(x + size as i32).min(right) {
-                let col = (dx - x) as usize * ART_SIZE / size;
-                let col = if flip { ART_SIZE - 1 - col } else { col };
-                let offset = (row * ART_SIZE + col) * 4;
-                let [r, g, b, a] = pixels[offset..offset + 4].try_into().unwrap();
-                if a >= 128 {
-                    self.pixels[dy as usize * WIDTH + dx as usize] =
-                        u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b);
+        let [left, top, right, bottom] = clip.map(|edge| edge * DISPLAY_SCALE as i32);
+        let (x, y) = (x * DISPLAY_SCALE as i32, y * DISPLAY_SCALE as i32);
+        let target = size * DISPLAY_SCALE;
+        for dy in y.max(top)..(y + target as i32).min(bottom) {
+            let row = (dy - y) as usize;
+            for dx in x.max(left)..(x + target as i32).min(right) {
+                let col = (dx - x) as usize;
+                let col = if flip { target - 1 - col } else { col };
+                let sample = sprite.sample(col, row, target);
+                if sample[3] != 0 {
+                    let dest = &mut self.pixels[dy as usize * BUFFER_WIDTH + dx as usize];
+                    *dest = sprite::over_rgb(sample, *dest);
                 }
             }
         }
@@ -114,6 +139,7 @@ impl Frame {
         }
         match game.scene {
             Scene::Title => self.title(),
+            Scene::Debug => self.draw_debug_menu(&game.debug_menu),
             Scene::Field => self.field(game),
             Scene::Battle => self.battle(game),
             Scene::Defeat => self.conclusion(game, false),
