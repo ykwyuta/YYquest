@@ -1,6 +1,7 @@
-use crate::game::{Enemy, Game, Scene, COMMANDS, MAX_HP, MEMORIES};
+use crate::game::{Enemy, Facing, Game, Scene, COMMANDS, MAX_HP, MEMORIES};
 
 mod debug;
+mod guide;
 mod island;
 mod map_art;
 mod sprite;
@@ -34,14 +35,21 @@ const _: () = {
     assert!(art_sizes::TITLE_HEIGHT == BUFFER_HEIGHT);
 };
 
-const ALLEN: Sprite = Sprite::new(
-    include_bytes!(concat!(env!("OUT_DIR"), "/allen.rgba")),
-    art_sizes::PORTRAIT,
-);
-const LILITH: Sprite = Sprite::new(
-    include_bytes!(concat!(env!("OUT_DIR"), "/lilith.rgba")),
-    art_sizes::PORTRAIT,
-);
+fn allen(facing: Facing) -> Sprite {
+    character_sprite(facing as usize)
+}
+
+fn lilith(facing: Facing) -> Sprite {
+    character_sprite(4 + facing as usize)
+}
+
+fn character_sprite(index: usize) -> Sprite {
+    const SIDE: usize = art_sizes::PORTRAIT;
+    const STRIDE: usize = SIDE * SIDE * 4;
+    const ATLAS: &[u8; 8 * STRIDE] =
+        include_bytes!(concat!(env!("OUT_DIR"), "/prologue-characters.rgba"));
+    Sprite::new(&ATLAS[index * STRIDE..(index + 1) * STRIDE], SIDE)
+}
 const SLIME: Sprite = Sprite::new(
     include_bytes!(concat!(env!("OUT_DIR"), "/slime.rgba")),
     art_sizes::PORTRAIT,
@@ -67,6 +75,7 @@ pub struct Label {
 pub struct Frame {
     pub pixels: Vec<u32>,
     pub labels: Vec<Label>,
+    guide: Option<guide::Route>,
 }
 
 impl Frame {
@@ -74,6 +83,7 @@ impl Frame {
         Self {
             pixels: vec![0; BUFFER_WIDTH * BUFFER_HEIGHT],
             labels: Vec::new(),
+            guide: None,
         }
     }
 
@@ -122,9 +132,24 @@ impl Frame {
         clip: [i32; 4],
         flip: bool,
     ) {
+        self.art_pixels(
+            sprite,
+            (x * DISPLAY_SCALE as i32, y * DISPLAY_SCALE as i32),
+            size * DISPLAY_SCALE,
+            clip,
+            flip,
+        );
+    }
+
+    fn art_pixels(
+        &mut self,
+        sprite: Sprite,
+        (x, y): (i32, i32),
+        target: usize,
+        clip: [i32; 4],
+        flip: bool,
+    ) {
         let [left, top, right, bottom] = clip.map(|edge| edge * DISPLAY_SCALE as i32);
-        let (x, y) = (x * DISPLAY_SCALE as i32, y * DISPLAY_SCALE as i32);
-        let target = size * DISPLAY_SCALE;
         for dy in y.max(top)..(y + target as i32).min(bottom) {
             let row = (dy - y) as usize;
             for dx in x.max(left)..(x + target as i32).min(right) {
@@ -209,9 +234,27 @@ impl Frame {
         );
         self.draw_prologue_landscape(game.lilith);
         if let Some((x, y)) = game.companion_position {
-            self.art(LILITH, 15 + x * 16, 23 + y * 16, 18);
+            self.art(lilith(game.companion_facing), 15 + x * 16, 23 + y * 16, 18);
         }
-        self.art(ALLEN, 15 + game.x * 16, 23 + game.y * 16, 18);
+        self.art(allen(game.facing), 15 + game.x * 16, 23 + game.y * 16, 18);
+        if game.message.is_none() && !game.journal {
+            let target = if game.lilith { (14, 2) } else { (13, 6) };
+            self.draw_guide(
+                guide::Guidance {
+                    area: guide::Area::Prologue,
+                    from: (game.x, game.y),
+                    to: target,
+                    size: (
+                        crate::game::MAP[0].len() as i32,
+                        crate::game::MAP.len() as i32,
+                    ),
+                },
+                Game::field_walkable,
+                |(x, y)| Game::tile(x, y) == b'.',
+                |(x, y)| (24 + x * 16, 34 + y * 16),
+                [16, 25, 304, 185],
+            );
+        }
         if let Some([first, second]) = game.message {
             self.panel(15, 174, 290, 55);
             self.label(24, 180, 11, IVORY, first);
@@ -220,9 +263,9 @@ impl Frame {
         } else {
             self.panel(15, 191, 290, 37);
             let objective = if game.lilith {
-                "リリスと北の石碑へ。"
+                "案内精霊　リリスと北の石碑へ。"
             } else {
-                "東の森へ。村のかまどで体力を回復できます。"
+                "案内精霊　東の森へ。かまどで回復できます。"
             };
             self.label(24, 196, 11, IVORY, objective);
             self.label(
@@ -320,8 +363,8 @@ impl Frame {
     fn conclusion(&mut self, game: &Game, won: bool) {
         self.landscape(0, 0, 320, 144);
         let (title, color, first, second) = if won {
-            self.art(ALLEN, 109, 73, 56);
-            self.art(LILITH, 155, 74, 56);
+            self.art(allen(Facing::South), 109, 73, 56);
+            self.art(lilith(Facing::South), 155, 74, 56);
             (
                 "序章　完",
                 GOLD,

@@ -12,7 +12,7 @@ impl Frame {
             return;
         }
         if let Some(island) = &world.island {
-            self.draw_island(island);
+            self.draw_island(island, world.guide_site(island));
             return;
         }
         self.label(16, 6, 12, GOLD, "環状列島ヴェルデリア");

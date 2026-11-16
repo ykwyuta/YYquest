@@ -273,7 +273,7 @@ fn isolate_settlement(mut image: RgbaImage, name: &str) -> RgbaImage {
     image
 }
 
-fn cell(atlas: &RgbaImage, cols: u32, rows: u32, col: u32, row: u32) -> RgbaImage {
+pub(super) fn cell(atlas: &RgbaImage, cols: u32, rows: u32, col: u32, row: u32) -> RgbaImage {
     let left = atlas.width() * col / cols;
     let right = atlas.width() * (col + 1) / cols;
     let top = atlas.height() * row / rows;

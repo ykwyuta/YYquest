@@ -377,8 +377,8 @@ fn prologue_ground(x: i32, y: i32) -> Ground {
 
 impl Frame {
     pub(super) fn draw_prologue_landscape(&mut self, lilith_joined: bool) {
-        use super::LILITH;
-        use crate::game::MAP;
+        use super::lilith;
+        use crate::game::{Facing, MAP};
 
         const LEFT: i32 = 16;
         const TOP: i32 = 25;
@@ -408,7 +408,7 @@ impl Frame {
                     }
                     b'H' => (COTTAGE, 27),
                     b'R' => (MEMORIAL, 26),
-                    b'L' if !lilith_joined => (LILITH, 18),
+                    b'L' if !lilith_joined => (lilith(Facing::South), 18),
                     _ => continue,
                 };
                 self.art_clipped(

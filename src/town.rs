@@ -3,7 +3,10 @@ mod nox;
 #[cfg(test)]
 mod tests;
 
-use crate::{game::Key, island::Position};
+use crate::{
+    game::{Facing, Key},
+    island::Position,
+};
 pub(crate) use map::{Landscape, Surface, HEIGHT, WIDTH};
 use nox::NOX;
 
@@ -146,10 +149,11 @@ pub(crate) enum Action {
 pub(crate) struct Town {
     pub(crate) index: usize,
     pub(crate) pos: Position,
+    pub(crate) facing: Facing,
     pub(crate) landscape: map::TownMap,
     pub(crate) panel: Panel,
     pub(crate) tracked: usize,
-    low_tide: bool,
+    pub(crate) low_tide: bool,
 }
 
 impl Town {
@@ -165,6 +169,7 @@ impl Town {
         Self {
             index,
             pos: plan.entry,
+            facing: Facing::South,
             landscape,
             panel: Panel::Explore,
             tracked,
@@ -174,6 +179,19 @@ impl Town {
 
     pub(crate) fn plan(&self) -> &'static Plan {
         plan(self.index)
+    }
+
+    pub(crate) fn guide_destination(&self, states: &[State; 5]) -> Option<&'static Place> {
+        let plan = self.plan();
+        let selected = plan.stories[self.tracked].objective(states[self.tracked]);
+        let next = || {
+            let index = states
+                .iter()
+                .position(|state| matches!(state, State::Active(_)))
+                .or_else(|| states.iter().position(|state| *state == State::New))?;
+            plan.stories[index].objective(states[index])
+        };
+        selected.or_else(next).map(|place| &plan.places[place])
     }
 
     pub(crate) fn nearby(&self) -> Option<usize> {
@@ -222,6 +240,7 @@ impl Town {
     }
 
     pub(crate) fn step(&mut self, dx: i32, dy: i32) {
+        self.facing = Facing::from_step(dx, dy).unwrap_or(self.facing);
         let next = (self.pos.0 + dx, self.pos.1 + dy);
         if self.landscape.walkable(next) {
             self.pos = next;

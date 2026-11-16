@@ -139,6 +139,28 @@ impl WorldMap {
         }
     }
 
+    pub(crate) fn guide_site(&self, island: &Island) -> Option<usize> {
+        if island.region != Region::Nox {
+            return None;
+        }
+        self.town_progress
+            .iter()
+            .enumerate()
+            .filter(|(_, states)| {
+                states
+                    .iter()
+                    .any(|state| !matches!(state, town::State::Done(_)))
+            })
+            .min_by_key(|(index, states)| {
+                let active = states
+                    .iter()
+                    .any(|state| matches!(state, town::State::Active(_)));
+                let (x, y) = island.settlements()[*index].door;
+                (!active, (x - island.x).abs() + (y - island.y).abs())
+            })
+            .map(|(index, _)| index)
+    }
+
     pub(crate) fn town_input(&mut self, key: Key) {
         let Some(town) = &mut self.town else { return };
         match town.input(key, &mut self.town_progress[town.index]) {
