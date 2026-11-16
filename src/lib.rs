@@ -101,8 +101,13 @@ mod web {
     }
 
     #[no_mangle]
-    extern "C" fn set_view_width(width: usize) {
-        let changed = SESSION.with(|session| session.borrow_mut().1.set_exploration_width(width));
+    extern "C" fn set_view_width(width: usize, minimap_inset: usize) {
+        let changed = SESSION.with(|session| {
+            session
+                .borrow_mut()
+                .1
+                .set_exploration_view(width, minimap_inset)
+        });
         if changed {
             draw();
         }

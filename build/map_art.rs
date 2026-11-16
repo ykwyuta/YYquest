@@ -11,11 +11,20 @@ pub(super) fn build(out: &Path) {
         &load(&format!("{ART_DIR}/terrain.png")),
         out,
         "map-terrain.rgb",
+        &[
+            (0, [-10, 13, -6]), // Grass
+            (1, [-7, 9, 4]),    // Woodland
+            (4, [0, 8, 19]),    // Sea
+            (5, [-2, 9, 18]),   // River
+            (7, [-9, 3, 9]),    // Marsh
+            (8, [14, 13, 10]),  // Trail
+        ],
     );
     build_textures(
         &load(&format!("{ART_DIR}/terrain-variants.png")),
         out,
         "map-terrain-variants.rgb",
+        &[(3, [-7, 11, 8]), (13, [0, 12, -4])], // Dune grass, flowers
     );
     build_roadside(out);
     build_fauna(out);
@@ -24,6 +33,21 @@ pub(super) fn build(out: &Path) {
         &load(&format!("{ART_DIR}/fine-ground.png")),
         out,
         "map-fine-ground.rgb",
+        &[
+            (0, [19, 23, 29]),  // Stone
+            (1, [21, 23, 20]),  // Moss cobbles
+            (2, [18, 18, 18]),  // Gravel
+            (3, [-7, -5, 9]),   // Obsidian
+            (4, [5, 5, 18]),    // Rubble
+            (8, [0, 22, 4]),    // Meadow and coastal grass
+            (9, [-10, 19, 8]),  // Forest moss
+            (10, [-13, 9, 9]),  // Woodland floor
+            (11, [4, -6, 13]),  // Heath
+            (12, [24, 18, 11]), // Rutted dirt road
+            (13, [28, 19, 8]),  // Mud road
+            (14, [35, 26, 17]), // Cinder road
+            (15, [20, 17, 7]),  // Dirt verge
+        ],
     );
     let sprites = load(&format!("{ART_DIR}/local-landmarks.png"));
     for (index, name) in [(1, "nox-cottage"), (4, "elder-tree"), (6, "memorial")] {
@@ -64,7 +88,7 @@ pub(super) fn build(out: &Path) {
     }
 }
 
-fn build_textures(textures: &RgbaImage, out: &Path, filename: &str) {
+fn build_textures(textures: &RgbaImage, out: &Path, filename: &str, tones: &[(u32, [i16; 3])]) {
     let mut terrain = Vec::new();
     for row in 0..4 {
         for col in 0..4 {
@@ -87,10 +111,15 @@ fn build_textures(textures: &RgbaImage, out: &Path, filename: &str) {
                 imageops::FilterType::Lanczos3,
             );
             soften_edges(&mut tile);
-            terrain.extend(
-                tile.pixels()
-                    .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]]),
-            );
+            let offset = tones
+                .iter()
+                .find(|(index, _)| *index == row * 4 + col)
+                .map_or([0; 3], |(_, offset)| *offset);
+            terrain.extend(tile.pixels().flat_map(|pixel| {
+                std::array::from_fn::<_, 3, _>(|c| {
+                    (i16::from(pixel[c]) + offset[c]).clamp(0, 255) as u8
+                })
+            }));
         }
     }
     fs::write(out.join(filename), terrain).unwrap();

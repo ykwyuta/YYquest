@@ -3,6 +3,7 @@ use super::{
     economy::item_icon,
     guide::{Area, Guidance},
     map_art::{self as art, Ground},
+    minimap::{Ground as MapGround, Landmark, Minimap},
     view::{View, ROWS, TILE_SIZE, TOP, ZOOM},
     Frame, GOLD, INK, IVORY, LINE, MINT, MIST,
 };
@@ -14,7 +15,13 @@ use crate::{
 };
 
 impl Frame {
-    pub(super) fn draw_town(&mut self, town: &Town, states: &[State; 5], goods: &Goods) {
+    pub(super) fn draw_town(
+        &mut self,
+        town: &Town,
+        states: &[State; 5],
+        goods: &Goods,
+        show_minimap: bool,
+    ) {
         let plan = town.plan();
         let view = View::following(self.width as i32, town.pos, (WIDTH, HEIGHT), &town.walk);
         let camera = view.camera;
@@ -172,15 +179,16 @@ impl Frame {
             &town.walk,
         );
         let destination = town.guide_destination(states);
+        let area = Area::Town {
+            region: town.region,
+            index: town.index,
+            low_tide: town.low_tide,
+            outcome: states[0],
+        };
         let remaining = if let (Panel::Explore, Some((target, _))) = (town.panel, destination) {
             self.draw_guide(
                 Guidance {
-                    area: Area::Town {
-                        region: town.region,
-                        index: town.index,
-                        low_tide: town.low_tide,
-                        outcome: states[0],
-                    },
+                    area,
                     from: town.pos,
                     to: target,
                     size: (WIDTH, HEIGHT),
@@ -211,6 +219,29 @@ impl Frame {
 
         match town.panel {
             Panel::Explore => {
+                if show_minimap {
+                    self.draw_minimap(
+                        view,
+                        Minimap {
+                            area,
+                            size: (WIDTH, HEIGHT),
+                            player: town.pos,
+                            target: destination.map(|(at, _)| at),
+                        },
+                        |at| match town.landscape.surface(at) {
+                            Surface::Sea | Surface::Water => MapGround::Water,
+                            Surface::Paving | Surface::Trail | Surface::Deck => MapGround::Road,
+                            Surface::Woods | Surface::Reeds => MapGround::Woods,
+                            Surface::Rock | Surface::Gravel => MapGround::Rock,
+                            Surface::Sand | Surface::Wheat => MapGround::Sand,
+                            _ => MapGround::Meadow,
+                        },
+                        plan.places
+                            .iter()
+                            .map(|place| (place.at, Landmark::Place))
+                            .chain(std::iter::once((plan.entry, Landmark::Exit))),
+                    );
+                }
                 if town.at_exit() {
                     self.label(24, 196, 11, GOLD, "島街道への出口");
                     self.label(24, 210, 10, IVORY, "決定で島フィールドに戻る");

@@ -6,15 +6,16 @@ const decoder = new TextDecoder();
 let wasm;
 let labels = [];
 let center = 0;
-let expectedWidth = 640;
+const scale = 3;
+let expectedViewWidth = 320;
 const imports = {
   screen: {
     bitmap(address, width, height) {
-      assert.equal(width, expectedWidth);
-      assert.equal(height, 480);
+      assert.equal(width, expectedViewWidth * scale);
+      assert.equal(height, 240 * scale);
       labels = [];
       const pixels = new Uint32Array(wasm.memory.buffer, address, width * height);
-      center = pixels[200 * width + width / 2];
+      center = pixels[100 * scale * width + width / 2];
     },
     text(_x, _y, _size, _color, address, length) {
       labels.push(decoder.decode(new Uint8Array(wasm.memory.buffer, address, length)));
@@ -36,8 +37,14 @@ function hasTitle() {
 }
 function hasDialogue(line) {
   assert.ok(labels.join("").includes(line), labels.join(" / "));
-  assert.ok(!labels.some((text) => text.startsWith("案内精霊：") || text.includes("移動　　決定　会話・調査")),
+  assert.ok(!labels.some((text) => text.startsWith("案内精霊トモル：") || text.includes("移動　　決定　会話・調査")),
     labels.join(" / "));
+}
+
+function hasMinimap(exit) {
+  for (const label of ["現在地", "目的地", "名所", exit].filter(Boolean)) {
+    assert.ok(labels.includes(label), labels.join(" / "));
+  }
 }
 
 const enter = 13, left = 37, up = 38, right = 39, down = 40, journal = 74;
@@ -53,28 +60,32 @@ press(map);
 assert.equal(wasm.is_title(), 0);
 has("黄昏の辺境領ノクス");
 has("虚無の海");
+assert.ok(!labels.includes("現在地"));
 press(enter);
 has("霧灯の港町");
+hasMinimap("港");
 assert.equal(wasm.animate_traffic(70), 1);
 press(right, right, right, ...Array(32).fill(up), left, left, left);
 has("灰灯りの村");
 has("街・村");
 press(enter);
 has("島街道への出口");
+hasMinimap("出口");
 press(journal);
 has("街の手記");
+assert.ok(!labels.includes("現在地"));
 has("炉の名札");
 has("灰の中の晩餐");
 press(down, journal);
-has("精霊　ガウェイン旧宅へ");
+has("トモル　ガウェイン旧宅へ");
 press(journal, up, journal);
-has("精霊　共同炉へ");
+has("トモル　共同炉へ");
 press(...Array(4).fill(left), ...Array(74).fill(up));
 has("共同炉");
 press(enter, enter);
 has("警備隊が避難してきた人");
 press(enter);
-has("精霊　冬越し小屋へ");
+has("トモル　冬越し小屋へ");
 press(...Array(20).fill(up), ...Array(65).fill(right), down);
 has("決定で刈り取る");
 press(enter, enter);
@@ -90,10 +101,13 @@ has("灰葉の傷薬");
 press(escape);
 has("街・村");
 press(enter);
-has("精霊　冬越し小屋へ");
+has("トモル　冬越し小屋へ");
 press(escape, escape, right, enter);
 has("黒鉄港町");
 press(enter);
+has("島街道への出口");
+hasMinimap("出口");
+press(escape, escape);
 has("虚無の海");
 press(escape);
 assert.equal(wasm.is_title(), 1);
@@ -101,20 +115,22 @@ hasTitle();
 // Enter the redesigned tutorial and verify the wide field and overview widths.
 press(enter);
 assert.equal(wasm.is_title(), 0);
-hasDialogue("灰灯りの村へ水が来なくなった");
+hasDialogue("東の森から水が止まり");
+assert.ok(!labels.includes("現在地"));
 assert.equal(wasm.has_map_control(), 0);
 press(enter);
 has("炉番に水門");
-expectedWidth = 1060;
+hasMinimap();
+expectedViewWidth = 530;
 wasm.set_view_width(530);
 has("炉番に水門");
-expectedWidth = 640;
+expectedViewWidth = 320;
 press(map);
 has("機工連邦ヴァルカン");
-expectedWidth = 1060;
+expectedViewWidth = 530;
 press(map);
 has("炉番に水門");
-expectedWidth = 640;
+expectedViewWidth = 320;
 wasm.set_view_width(320);
 
 wasm.press_direction(down, 1);
@@ -126,6 +142,8 @@ wasm.press_direction(up, 1);
 assert.equal(wasm.animate_traffic(80), 1);
 assert.equal(wasm.animate_traffic(64), 1);
 wasm.release_direction(up, 1);
+press(enter);
+hasDialogue("トモル』が目覚めたのかい");
 press(enter);
 hasDialogue("東の森から笛の音");
 has("炉番");
@@ -164,7 +182,7 @@ press(enter);
 hasDialogue("リリスが仲間になった");
 press(enter, left, down, down, ...Array(10).fill(left), up, up, enter, enter);
 has("灰灯りの村");
-has("精霊　ガウェイン旧宅へ");
+has("トモル　ガウェイン旧宅へ");
 
 const savedSize = wasm.checkpoint_size();
 assert.ok(savedSize > 0);
@@ -179,7 +197,7 @@ wasm.draw();
 has("つづきから");
 press(enter);
 has("灰灯りの村");
-has("精霊　ガウェイン旧宅へ");
+has("トモル　ガウェイン旧宅へ");
 assert.equal(wasm.take_sound(), 1);
 
 const restarted = await WebAssembly.instantiate(binary, imports);

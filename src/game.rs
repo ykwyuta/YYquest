@@ -1474,9 +1474,11 @@ mod tests {
             .labels
             .iter()
             .any(|label| label.text == format!("アレン  HP {damaged:02}/{MAX_HP}")));
-        let row = &frame.pixels[38 * crate::render::BUFFER_WIDTH..39 * crate::render::BUFFER_WIDTH];
-        assert_ne!(row[17 * 2], row[166 * 2]);
-        assert_ne!(row[208 * 2], row[301 * 2]);
+        let scale = crate::render::DISPLAY_SCALE;
+        let stride = crate::render::BUFFER_WIDTH;
+        let row = &frame.pixels[19 * scale * stride..][..stride];
+        assert_ne!(row[17 * scale], row[166 * scale]);
+        assert_ne!(row[208 * scale], row[301 * scale]);
 
         press(&mut game, &[Confirm, Up, Confirm, Confirm]);
         assert_eq!(game.goods.count(Item::Poultice), 1);

@@ -200,6 +200,10 @@ button:active { background: #6f573bd9; }
 
 @media (orientation: portrait) and (max-width: 700px) {
   .game-stage { --screen-width: min(100%, 560px); }
+  .game-stage[data-controls="overlay"] .directions {
+    --key: 44px;
+    --pad-gap: 3px;
+  }
   .game-stage[data-controls="outside"]:has(#controls:not([hidden])) {
     grid-template: "game game" auto "directions actions" auto / 1fr 1fr;
     gap: 9px 4px;
