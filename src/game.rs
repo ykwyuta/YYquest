@@ -254,7 +254,7 @@ impl Game {
     pub fn advance_traffic(&mut self, milliseconds: u32) -> bool {
         let animated = if self.map_open {
             if let Some(town) = &mut self.world_map.town {
-                town.walk.advance(milliseconds)
+                town.walk.advance(milliseconds) | town.advance_gathering(milliseconds)
             } else {
                 self.world_map
                     .island
@@ -394,7 +394,10 @@ impl Game {
             return;
         }
         if self.map_open {
-            if let Some(town) = &self.world_map.town {
+            if let Some(town) = &mut self.world_map.town {
+                if key == Key::Confirm && town.gather(&mut self.goods) {
+                    return;
+                }
                 let index = town.index;
                 let previous = self.world_map.town_progress[index];
                 let position = town.pos;
@@ -1030,13 +1033,10 @@ mod tests {
 
     #[test]
     fn nox_services_collect_brew_craft_equip_and_trade() {
-        use crate::{
-            economy::{Item, Service},
-            town::Action,
-        };
+        use crate::{economy::Item, town::Action};
         use Key::*;
 
-        fn visit(game: &mut Game, town: usize, place: usize) {
+        fn enter(game: &mut Game, town: usize) {
             game.map_open = true;
             game.world_map.selected = Region::Nox;
             if game.world_map.island.is_none() {
@@ -1045,6 +1045,10 @@ mod tests {
             let island = game.world_map.island.as_mut().unwrap();
             (island.x, island.y) = island.settlements()[town].door;
             game.input(Confirm);
+        }
+
+        fn visit(game: &mut Game, town: usize, place: usize) {
+            enter(game, town);
             let map = game.world_map.town.as_mut().unwrap();
             map.pos = map.plan().places[place].at;
             let row = map
@@ -1059,13 +1063,37 @@ mod tests {
             assert!(game.economy_menu.is_some());
         }
 
+        fn collect(game: &mut Game, item: Item) {
+            let map = game.world_map.town.as_mut().unwrap();
+            let spot = map
+                .gathering_spots()
+                .iter()
+                .find(|spot| spot.item == item)
+                .unwrap();
+            map.pos = (spot.at.0, spot.at.1 - 1);
+            game.input(Confirm);
+            assert!(game.economy_menu.is_none());
+            let gathering = game
+                .world_map
+                .town
+                .as_ref()
+                .unwrap()
+                .gathering
+                .as_ref()
+                .unwrap();
+            assert_eq!(gathering.spot.item, item);
+            assert!(gathering.result.is_ok());
+        }
+
         let mut game = Game::new();
-        visit(&mut game, 0, 3);
-        press(&mut game, &[Confirm, Confirm, Down, Confirm]);
+        enter(&mut game, 0);
+        collect(&mut game, Item::AshHerb);
+        game.input(Confirm);
+        collect(&mut game, Item::AshWood);
         assert_eq!(game.goods.count(Item::AshHerb), 3);
         assert_eq!(game.goods.count(Item::AshWood), 2);
         assert!(game.goods.gather_wait(Item::AshHerb) > 0);
-        press(&mut game, &[Back, Back, Map]);
+        game.input(Back);
 
         visit(&mut game, 0, 7);
         game.input(Confirm);
@@ -1080,10 +1108,9 @@ mod tests {
         assert_eq!(game.goods.count(Item::AshWood), 2);
         press(&mut game, &[Back, Back, Map]);
 
-        visit(&mut game, 5, 3);
-        assert!(matches!(Service::at(5, 3), Some(Service::Gather(_))));
-        game.input(Confirm);
-        press(&mut game, &[Back, Back, Map]);
+        enter(&mut game, 5);
+        collect(&mut game, Item::BogIron);
+        game.input(Back);
         visit(&mut game, 5, 1);
         press(&mut game, &[Confirm, Confirm]);
         assert_eq!(game.goods.coins, 6);

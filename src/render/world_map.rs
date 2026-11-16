@@ -1,14 +1,17 @@
 use super::{Frame, GOLD, INK, IVORY, LINE, MINT, MIST};
-use crate::world_map::{Region, WorldMap, MAP};
+use crate::{
+    economy::Goods,
+    world_map::{Region, WorldMap, MAP},
+};
 
 const LEFT: i32 = 16;
 const TOP: i32 = 24;
 const CELL: i32 = 12;
 
 impl Frame {
-    pub(super) fn draw_world_map(&mut self, world: &WorldMap) {
+    pub(super) fn draw_world_map(&mut self, world: &WorldMap, goods: &Goods) {
         if let Some(town) = &world.town {
-            self.draw_town(town, &world.town_progress[town.index]);
+            self.draw_town(town, &world.town_progress[town.index], goods);
             return;
         }
         if let Some(island) = &world.island {

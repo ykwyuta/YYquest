@@ -11,7 +11,7 @@ pub(super) static NOX: [Plan; 10] = [
             Place { name: "共同炉", at: (154, 98), art: Some(Art::Hearth), ground: Landscape::Yard, detail: "村の中心にある大きな炉。薪当番が昼夜火を守っている。" },
             Place { name: "ガウェイン旧宅", at: (91, 106), art: Some(Art::Cottage), ground: Landscape::Yard, detail: "アレンが父と暮らした家。隣人は昔の雪の日をよく覚えている。" },
             Place { name: "冬越し小屋", at: (146, 38), art: Some(Art::Inn), ground: Landscape::Yard, detail: "事情を問わず身を寄せられる小屋。裏の斜面から薪道が続く。" },
-            Place { name: "薪割り場", at: (222, 80), art: Some(Art::Cottage), ground: Landscape::Wood, detail: "東の林のはずれに、冬を越すための薪が積まれている。" },
+            Place { name: "薪割り場", at: (222, 80), art: Some(Art::Cottage), ground: Landscape::Wood, detail: "冬の薪が積んである。南西の林縁には灰葉草が生え、南東には灰樹の枝が落ちている。" },
             Place { name: "寄合小屋", at: (173, 104), art: Some(Art::Cottage), ground: Landscape::Square, detail: "村の暮らしを話し合う小屋。今夜は避難民の名簿が議題だ。" },
             Place { name: "薪道の雪隠れ", at: (207, 40), art: None, ground: Landscape::Wood, detail: "雪の上に、小さな足跡が点々と続いている。" },
             Place { name: "旧宅の繕い台", at: (75, 101), art: None, ground: Landscape::Yard, detail: "壁に、子ども用の古い手袋の型紙が留められている。" },
