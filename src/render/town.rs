@@ -1,7 +1,9 @@
 use super::{
+    allen,
+    guide::{Area, Guidance},
     island::{COLUMNS, LEFT, ROWS, TILE_SIZE, TOP, VIEW},
     map_art::{self as art, Ground},
-    Frame, ALLEN, GOLD, INK, IVORY, LINE, MINT, MIST,
+    Frame, GOLD, INK, IVORY, LINE, MINT, MIST,
 };
 use crate::{
     island::Position,
@@ -111,7 +113,7 @@ impl Frame {
             if town.pos.1 == row {
                 let (x, y) = point(town.pos);
                 frame.rect(x + 2, y + 10, 9, 2, INK);
-                frame.art_clipped(ALLEN, x - 1, y - 2, 14, VIEW);
+                frame.art_clipped(allen(town.facing), x - 1, y - 2, 14, VIEW);
             }
         };
         let mut props = town.landscape.props.iter().peekable();
@@ -146,6 +148,31 @@ impl Frame {
             self.rect(x + 1, y, 8, 1, GOLD);
         }
 
+        let destination = town.guide_destination(states);
+        let remaining = if let (Panel::Explore, Some(place)) = (town.panel, destination) {
+            self.draw_guide(
+                Guidance {
+                    area: Area::Town {
+                        index: town.index,
+                        low_tide: town.low_tide,
+                        outcome: states[0],
+                    },
+                    from: town.pos,
+                    to: place.at,
+                    size: (WIDTH, HEIGHT),
+                },
+                |at| town.landscape.walkable(at),
+                |at| town.landscape.surface(at).road(),
+                |at| {
+                    let (x, y) = point(at);
+                    (x + 6, y + 8)
+                },
+                VIEW,
+            )
+        } else {
+            None
+        };
+
         self.label(16, 6, 12, GOLD, plan.name);
         self.label(204, 8, 9, MIST, "J 手記　M 島へ");
         let completed = states
@@ -177,18 +204,18 @@ impl Frame {
                     self.label(24, 196, 11, GOLD, area);
                     self.label(24, 210, 10, IVORY, "街の施設や住民を訪ねよう");
                 }
-                let story = &plan.stories[town.tracked];
-                if let Some(index) = story.objective(states[town.tracked]) {
-                    let place = &plan.places[index];
-                    self.label(
-                        24,
-                        223,
-                        9,
-                        MINT,
-                        format!("{}へ　{}", place.name, bearing(town.pos, place.at)),
-                    );
+                if let Some(place) = destination {
+                    let mut route = format!("精霊　{}へ", place.name);
+                    if let Some(steps) = remaining {
+                        if steps == 0 {
+                            route.push_str("　到着");
+                        } else {
+                            route.push_str(&format!("　あと{steps}歩"));
+                        }
+                    }
+                    self.label(24, 223, 9, MINT, route);
                 } else {
-                    self.label(24, 223, 9, MINT, "J 手記から次の話を選べる");
+                    self.label(24, 223, 9, MIST, "この街の依頼をすべて解決した");
                 }
             }
             Panel::Journal => self.draw_town_journal(town, states),
@@ -333,22 +360,6 @@ impl Frame {
             );
         }
     }
-}
-
-fn bearing(from: Position, to: Position) -> String {
-    let (dx, dy) = (to.0 - from.0, to.1 - from.1);
-    let direction = match (dx.signum(), dy.signum()) {
-        (0, 0) => "到着",
-        (0, -1) => "北",
-        (1, -1) => "北東",
-        (1, 0) => "東",
-        (1, 1) => "南東",
-        (0, 1) => "南",
-        (-1, 1) => "南西",
-        (-1, 0) => "西",
-        _ => "北西",
-    };
-    format!("{direction} {}タイル", dx.abs().max(dy.abs()))
 }
 
 fn ground(tile: Surface, x: i32, y: i32) -> Ground {

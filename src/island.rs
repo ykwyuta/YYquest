@@ -3,7 +3,7 @@ mod maps;
 mod terrain;
 pub(crate) mod traffic;
 
-use crate::world_map::Region;
+use crate::{game::Facing, world_map::Region};
 
 const PLAN_WIDTH: usize = 26;
 const PLAN_HEIGHT: usize = 18;
@@ -112,7 +112,7 @@ pub(crate) enum Tile {
 }
 
 impl Tile {
-    fn walkable(self) -> bool {
+    pub(crate) fn walkable(self) -> bool {
         !matches!(
             self,
             Self::Sea | Self::Cliff | Self::Forest | Self::Water | Self::Lava | Self::Building(_)
@@ -124,6 +124,7 @@ pub(crate) struct Island {
     pub(crate) region: Region,
     pub(crate) x: i32,
     pub(crate) y: i32,
+    pub(crate) facing: Facing,
     layout: &'static Layout,
     tiles: Vec<Tile>,
     settlements: [Settlement; SETTLEMENTS],
@@ -162,6 +163,7 @@ impl Island {
             region,
             x,
             y,
+            facing: Facing::South,
             layout,
             tiles,
             settlements,
@@ -212,6 +214,7 @@ impl Island {
     }
 
     pub(crate) fn step(&mut self, dx: i32, dy: i32) {
+        self.facing = Facing::from_step(dx, dy).unwrap_or(self.facing);
         let (x, y) = (self.x + dx, self.y + dy);
         if self.tile(x, y).walkable() {
             (self.x, self.y) = (x, y);

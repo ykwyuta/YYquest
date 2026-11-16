@@ -65,6 +65,12 @@ fn fit_sprite(image: &RgbaImage, name: &str, side: usize) -> RgbaImage {
 fn main() {
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     map_art::build(&out);
+    export(
+        &load("assets/guide-spirit.png"),
+        "guide-spirit",
+        art_sizes::MAP_OBJECT,
+        &out,
+    );
     let title = load("assets/title-arcadia.png");
     let title = imageops::resize(
         &title,
@@ -78,11 +84,17 @@ fn main() {
         .collect();
     fs::write(out.join("title.rgb"), title).unwrap();
     let heroes = load("assets/prologue-characters.png");
-    let half = heroes.width() / 2;
-    for (name, offset) in [("allen", 0), ("lilith", half)] {
-        let cell = imageops::crop_imm(&heroes, offset, 0, half, heroes.height()).to_image();
-        export(&cell, name, art_sizes::PORTRAIT, &out);
+    let mut characters = Vec::new();
+    // Each row holds one character facing south, west, east, and north.
+    for row in 0..2 {
+        for col in 0..4 {
+            let cell = map_art::cell(&heroes, 4, 2, col, row);
+            let name = format!("prologue character {row}/{col}");
+            let sprite = fit_sprite(&cell, &name, art_sizes::PORTRAIT);
+            characters.extend(sprite.into_raw());
+        }
     }
+    fs::write(out.join("prologue-characters.rgba"), characters).unwrap();
     for (name, path) in [
         ("slime", "assets/slime.png"),
         ("bat", "assets/bat.png"),

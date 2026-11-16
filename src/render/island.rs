@@ -1,6 +1,8 @@
 use super::{
+    allen,
+    guide::{Area, Guidance},
     map_art::{self as art, Ground},
-    Frame, ALLEN, GOLD, INK, IVORY, LINE, MINT, MIST,
+    Frame, GOLD, INK, IVORY, LINE, MINT, MIST,
 };
 use crate::{
     island::{Island, Kind, Tile, HEIGHT, WIDTH},
@@ -20,7 +22,7 @@ pub(super) const VIEW: [i32; 4] = [
 ];
 
 impl Frame {
-    pub(super) fn draw_island(&mut self, island: &Island) {
+    pub(super) fn draw_island(&mut self, island: &Island, guide_site: Option<usize>) {
         let (title, _) = island.region.caption();
         self.label(16, 6, 12, GOLD, title);
         self.label(203, 8, 9, MIST, "M / Esc  全体図");
@@ -81,7 +83,27 @@ impl Frame {
         let px = LEFT + (island.x - camera_x) * TILE_SIZE;
         let py = TOP + (island.y - camera_y) * TILE_SIZE;
         self.rect(px + 2, py + 10, 9, 2, INK);
-        self.art_clipped(ALLEN, px - 1, py - 2, 14, VIEW);
+        self.art_clipped(allen(island.facing), px - 1, py - 2, 14, VIEW);
+        let destination = guide_site.map(|index| &island.settlements()[index]);
+        if let Some(destination) = destination {
+            self.draw_guide(
+                Guidance {
+                    area: Area::Nox,
+                    from: (island.x, island.y),
+                    to: destination.door,
+                    size: (WIDTH, HEIGHT),
+                },
+                |(x, y)| island.tile(x, y).walkable(),
+                |(x, y)| matches!(island.tile(x, y), Tile::Road | Tile::Bridge | Tile::Plaza),
+                |(x, y)| {
+                    (
+                        LEFT + (x - camera_x) * TILE_SIZE + 6,
+                        TOP + (y - camera_y) * TILE_SIZE + 8,
+                    )
+                },
+                VIEW,
+            );
+        }
 
         self.panel(15, 191, 290, 46);
         let site = island.current_landmark();
@@ -119,13 +141,23 @@ impl Frame {
                 ground
             };
             self.label(24, 196, 11, GOLD, ground);
-            self.label(
-                24,
-                210,
-                10,
-                IVORY,
-                "街や廃墟の手前にある目印まで歩いてみよう。",
-            );
+            if let Some(destination) = destination {
+                self.label(
+                    24,
+                    210,
+                    10,
+                    MINT,
+                    format!("案内精霊　{}へ", destination.landmark.name),
+                );
+            } else {
+                self.label(
+                    24,
+                    210,
+                    10,
+                    IVORY,
+                    "街や廃墟の手前にある目印まで歩いてみよう。",
+                );
+            }
         }
         self.label(24, 224, 9, MIST, "矢印 / WASD  移動");
         if island.region == Region::Nox

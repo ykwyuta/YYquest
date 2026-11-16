@@ -41,6 +41,28 @@ impl Key {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(usize)]
+pub(crate) enum Facing {
+    #[default]
+    South,
+    West,
+    East,
+    North,
+}
+
+impl Facing {
+    pub(crate) fn from_step(dx: i32, dy: i32) -> Option<Self> {
+        match (dx.signum(), dy.signum()) {
+            (0, 1) => Some(Self::South),
+            (-1, 0) => Some(Self::West),
+            (1, 0) => Some(Self::East),
+            (0, -1) => Some(Self::North),
+            _ => None,
+        }
+    }
+}
+
 pub const MAP: [&[u8; 18]; 10] = [
     b"~~~~~~~~~~~~~~~~~~",
     b"~######.#########~",
@@ -145,6 +167,8 @@ pub struct Game {
     pub memories: usize,
     pub lilith: bool,
     pub companion_position: Option<(i32, i32)>,
+    pub(crate) facing: Facing,
+    pub(crate) companion_facing: Facing,
     pub journal: bool,
     pub message: Option<[&'static str; 2]>,
     pub battle: Option<Battle>,
@@ -166,6 +190,8 @@ impl Game {
             memories: MEMORIES.len(),
             lilith: false,
             companion_position: None,
+            facing: Facing::South,
+            companion_facing: Facing::South,
             journal: false,
             message: None,
             battle: None,
@@ -183,6 +209,10 @@ impl Game {
             .and_then(|row| row.get(x as usize))
             .copied()
             .unwrap_or(b'#')
+    }
+
+    pub(crate) fn field_walkable(at: (i32, i32)) -> bool {
+        !matches!(Self::tile(at.0, at.1), b'#' | b'~')
     }
 
     pub(crate) fn can_open_map(&self) -> bool {
@@ -380,12 +410,16 @@ impl Game {
         let Some((dx, dy)) = key.direction() else {
             return;
         };
+        self.facing = Facing::from_step(dx, dy).unwrap_or(self.facing);
         let (x, y) = (self.x + dx, self.y + dy);
-        let tile = Self::tile(x, y);
-        if matches!(tile, b'#' | b'~') {
+        if !Self::field_walkable((x, y)) {
             return;
         }
+        let tile = Self::tile(x, y);
         if self.lilith {
+            self.companion_facing = self.companion_position.map_or(self.facing, |(cx, cy)| {
+                Facing::from_step(self.x - cx, self.y - cy).unwrap_or(self.companion_facing)
+            });
             self.companion_position = Some((self.x, self.y));
         }
         self.x = x;
@@ -552,6 +586,24 @@ mod tests {
         for key in keys {
             game.input(*key);
         }
+    }
+
+    #[test]
+    fn party_members_face_their_own_direction_when_turning() {
+        let mut game = Game::new();
+        press(&mut game, &[Key::Confirm, Key::Confirm]);
+        press(&mut game, &[Key::Right; 10]);
+        press(&mut game, &[Key::Down, Key::Down, Key::Confirm, Key::Left]);
+
+        assert_eq!(game.facing, Facing::West);
+        assert_eq!(game.companion_facing, Facing::West);
+        assert_eq!(game.companion_position, Some((13, 6)));
+
+        game.input(Key::Up);
+        assert_eq!((game.x, game.y), (12, 5));
+        assert_eq!(game.facing, Facing::North);
+        assert_eq!(game.companion_facing, Facing::West);
+        assert_eq!(game.companion_position, Some((12, 6)));
     }
 
     #[test]
