@@ -3,14 +3,22 @@ const canvas = document.querySelector("#game");
 const view = canvas.getContext("2d", { alpha: false });
 let image;
 const decoder = new TextDecoder();
+const encoder = new TextEncoder();
 const status = document.querySelector("#status");
 const controls = document.querySelector("#controls");
 const stage = document.querySelector(".game-stage");
 const touchLayout = document.querySelector("#touch-layout");
 const layoutPreference = "yyquest-touch-controls";
+const saveKey = "yyquest-adventure";
+let lastSaved;
+let saveFailed = false;
 const desktopControls = matchMedia("(hover: hover) and (pointer: fine) and (min-width: 701px)");
 const refreshButton = document.querySelector("#cache-refresh");
 const mapButton = document.querySelector("#map-control");
+const soundButton = document.querySelector("#sound-toggle");
+const soundPreference = "yyquest-sound";
+let audio;
+let soundEnabled = true;
 const refreshParam = "_yyrefresh";
 const keys = new Map([
   ["ArrowUp", 38], ["ArrowDown", 40], ["ArrowLeft", 37], ["ArrowRight", 39],
@@ -35,8 +43,51 @@ function setControlLayout(layout) {
 try {
   const saved = localStorage.getItem(layoutPreference);
   if (saved === "outside" || saved === "overlay") preferredLayout = saved;
+  soundEnabled = localStorage.getItem(soundPreference) !== "off";
 } catch {
   // Touch controls still work when browser storage is unavailable.
+}
+
+soundButton.setAttribute("aria-pressed", soundEnabled);
+soundButton.addEventListener("click", () => {
+  soundEnabled = !soundEnabled;
+  soundButton.setAttribute("aria-pressed", soundEnabled);
+  if (soundEnabled) unlockSound();
+  try {
+    localStorage.setItem(soundPreference, soundEnabled ? "on" : "off");
+  } catch {
+    // Keep the selection for the current visit.
+  }
+});
+
+function unlockSound() {
+  if (!soundEnabled || !window.AudioContext) return;
+  try {
+    audio ??= new AudioContext();
+  } catch {
+    return;
+  }
+  if (audio.state === "suspended") audio.resume().catch(() => {});
+}
+
+const soundNotes = [[], [587], [196, 147], [523, 659, 784], [392, 523, 659, 784]];
+
+function playSound() {
+  const cue = wasm.take_sound();
+  if (!cue || !soundEnabled || audio?.state !== "running") return;
+  const now = audio.currentTime;
+  for (const [index, hz] of soundNotes[cue].entries()) {
+    const at = now + index * 0.065;
+    const oscillator = audio.createOscillator();
+    const volume = audio.createGain();
+    oscillator.type = "triangle";
+    oscillator.frequency.value = hz;
+    volume.gain.setValueAtTime(0.065, at);
+    volume.gain.exponentialRampToValueAtTime(0.001, at + 0.085);
+    oscillator.connect(volume).connect(audio.destination);
+    oscillator.start(at);
+    oscillator.stop(at + 0.09);
+  }
 }
 
 function applyControlLayout() {
@@ -63,7 +114,8 @@ function resizeViewport() {
   if (matchMedia("(orientation: landscape)").matches) {
     const page = getComputedStyle(stage.parentElement);
     const height = (window.visualViewport?.height ?? window.innerHeight)
-      - parseFloat(page.paddingTop) - parseFloat(page.paddingBottom);
+      - parseFloat(page.paddingTop) - parseFloat(page.paddingBottom)
+      - (parseFloat(page.getPropertyValue("--footer-height")) || 0);
     let available = stage.clientWidth;
     if (stage.dataset.controls === "outside" && getComputedStyle(controls).display === "contents") {
       available -= stage.querySelector(".directions").offsetWidth + stage.querySelector(".actions").offsetWidth;
@@ -201,8 +253,49 @@ refreshButton.addEventListener("click", async () => {
 
 function sendKey(key, repeat = false) {
   if (!wasm || refreshButton.disabled) return;
+  if (key === 13) saveAdventure();
   wasm.key(key, repeat);
+  playSound();
   updateControls();
+  if (!directions.has(key)) saveAdventure();
+}
+
+function loadAdventure() {
+  try {
+    const saved = localStorage.getItem(saveKey);
+    if (!saved) return;
+    const bytes = encoder.encode(saved);
+    const address = wasm.prepare_save_load(bytes.length);
+    if (address) {
+      new Uint8Array(wasm.memory.buffer, address, bytes.length).set(bytes);
+      if (wasm.offer_continue()) {
+        lastSaved = saved;
+        return;
+      }
+    }
+    showStatus("冒険の記録を読み込めませんでした。");
+  } catch (error) {
+    showStatus("ブラウザの保存領域を開けませんでした。");
+    console.warn(error);
+  }
+}
+
+function saveAdventure() {
+  if (!wasm?.checkpoint_size) return;
+  const size = wasm.checkpoint_size();
+  if (!size) return;
+  const saved = decoder.decode(new Uint8Array(wasm.memory.buffer, wasm.checkpoint_ptr(), size));
+  if (saved === lastSaved) return;
+  try {
+    localStorage.setItem(saveKey, saved);
+    lastSaved = saved;
+    if (saveFailed) status.hidden = true;
+    saveFailed = false;
+  } catch (error) {
+    if (!saveFailed) console.warn(error);
+    saveFailed = true;
+    showStatus("冒険の記録を保存できませんでした。");
+  }
 }
 
 function pressDirection(code, source) {
@@ -226,7 +319,7 @@ function updateControls() {
   refreshButton.hidden = !wasm.is_title();
   mapButton.textContent = wasm.debug_back_control() ? "戻る" : "地図";
   mapButton.hidden = !wasm.has_map_control();
-  if (refreshButton.hidden) status.hidden = true;
+  if (refreshButton.hidden && !saveFailed) status.hidden = true;
 }
 
 try {
@@ -234,10 +327,12 @@ try {
   if (!response.ok) throw new Error(`Wasm download failed (${response.status})`);
   const { instance } = await WebAssembly.instantiate(await response.arrayBuffer(), { screen });
   wasm = instance.exports;
+  status.hidden = true;
+  loadAdventure();
   wasm.draw();
   mapButton.hidden = !wasm.has_map_control();
-  status.hidden = true;
   controls.hidden = false;
+  soundButton.hidden = !window.AudioContext;
   touchLayout.hidden = false;
   resizeViewport();
   previousTrafficFrame = performance.now();
@@ -253,6 +348,7 @@ window.addEventListener("keydown", (event) => {
   if (event.target instanceof HTMLButtonElement && ["Enter", "Space"].includes(event.code)) return;
   const key = keys.get(event.code) ?? keys.get(event.key);
   if (key === undefined) return;
+  unlockSound();
   event.preventDefault();
   if (event.repeat) {
     if (!wasm.press_direction && directions.has(key)) sendKey(key, true);
@@ -268,8 +364,12 @@ window.addEventListener("keyup", (event) => {
 });
 
 window.addEventListener("blur", clearHeldDirections);
+window.addEventListener("pagehide", saveAdventure);
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) clearHeldDirections();
+  if (document.hidden) {
+    clearHeldDirections();
+    saveAdventure();
+  }
 });
 
 const dpad = controls.querySelector(".directions");
@@ -298,6 +398,7 @@ dpad.addEventListener("contextmenu", (event) => event.preventDefault());
 controls.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-key]");
   if (!button) return;
+  unlockSound();
   const key = Number(button.dataset.key);
   if (!directions.has(key) || event.detail === 0) sendKey(key);
 });

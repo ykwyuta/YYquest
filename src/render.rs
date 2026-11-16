@@ -1,8 +1,9 @@
-use crate::game::{Enemy, Facing, Game, Scene, COMMANDS, MAX_HP, MEMORIES};
+use crate::game::{Enemy, Facing, Game, Scene, Tactic, COMMANDS, MAX_HP, MEMORIES};
 use crate::walk::Pose;
 
 mod debug;
 mod economy;
+mod fort;
 mod guide;
 mod island;
 mod map_art;
@@ -218,7 +219,7 @@ impl Frame {
             return;
         }
         match game.scene {
-            Scene::Title => self.title(),
+            Scene::Title => self.title(game),
             Scene::Debug => self.draw_debug_menu(&game.debug_menu),
             Scene::Field => self.field(game),
             Scene::Battle => self.battle(game),
@@ -244,7 +245,7 @@ impl Frame {
         }
     }
 
-    fn title(&mut self) {
+    fn title(&mut self, game: &Game) {
         for (dest, [red, green, blue]) in self.pixels.iter_mut().zip(TITLE.as_chunks::<3>().0) {
             *dest = u32::from_be_bytes([0, *red, *green, *blue]);
         }
@@ -267,9 +268,33 @@ impl Frame {
         self.rect(21, 112, 143, 1, bronze);
         self.rect(21, 111, 26, 3, 0xc09a6a);
         self.label(22, 123, 11, 0xe4cda4, "第一章　帰らなかった灯");
-        self.label(21, 149, 13, 0xffdc9e, "▶　旅をはじめる");
-        self.label(23, 173, 9, 0xe2d6c2, "Enter / Z で決定");
-        self.label(23, 188, 9, 0xe2d6c2, "M  ワールドマップ");
+        if game.confirm_overwrite {
+            self.panel(16, 140, 208, 68);
+            self.label(23, 150, 10, GOLD, "前の冒険の記録を上書きしますか？");
+            self.label(23, 178, 9, IVORY, "決定　新しく始める　　Esc　戻る");
+        } else if game.has_continue() {
+            let marker = |selected| if selected { "▶" } else { "　" };
+            self.label(
+                21,
+                147,
+                12,
+                GOLD,
+                format!("{}　つづきから", marker(!game.title_new_game)),
+            );
+            self.label(
+                21,
+                166,
+                12,
+                GOLD,
+                format!("{}　旅をはじめる", marker(game.title_new_game)),
+            );
+            self.label(23, 188, 9, IVORY, "↑ ↓ 選ぶ　 Enter / Z 決定");
+            self.label(23, 204, 9, IVORY, "M  ワールドマップ");
+        } else {
+            self.label(21, 149, 13, 0xffdc9e, "▶　旅をはじめる");
+            self.label(23, 173, 9, 0xe2d6c2, "Enter / Z で決定");
+            self.label(23, 188, 9, 0xe2d6c2, "M  ワールドマップ");
+        }
     }
 
     fn field(&mut self, game: &Game) {
@@ -373,7 +398,7 @@ impl Frame {
         let art = match battle.enemy {
             Enemy::Slime => SLIME,
             Enemy::Bat => BAT,
-            Enemy::Echo => ECHO,
+            Enemy::Echo | Enemy::FortEcho | Enemy::AbyssLord => ECHO,
             Enemy::Beast(beast) => map_art::fauna_sprite(beast.0),
         };
         self.landscape(0, 23, 320, 125);
@@ -407,6 +432,15 @@ impl Frame {
         );
         if let Some(tip) = game.lesson_tip() {
             self.label(89, 136, 9, MINT, tip);
+        } else if battle.enemy.tactic() == Tactic::Charge {
+            let tip = if battle.charged {
+                "大技の構え！　精霊共鳴か防御でしのぐ"
+            } else {
+                "敵が間合いを測っている"
+            };
+            self.label(89, 136, 9, MINT, tip);
+        } else if battle.enemy.tactic() == Tactic::Shell {
+            self.label(89, 136, 9, MINT, "硬い殻が剣を弾く。魔法や共鳴が有効");
         }
         self.panel(15, 155, 290, 74);
         if let Some([first, second]) = &battle.log {
@@ -463,15 +497,30 @@ impl Frame {
 
     fn conclusion(&mut self, game: &Game, won: bool) {
         self.landscape(0, 0, 320, 144);
+        let finished = game.world_map.campaign.finished();
         let (title, color, first, second) = if won {
             self.art(allen(Facing::South, Pose::Standing), 109, 73, 56);
             self.art(lilith(Facing::South, Pose::Standing), 155, 74, 56);
-            (
-                "第一章　ノクス　完",
-                GOLD,
-                "救助の記録は、霧灯の港に残った。",
-                "二人の次の目的地は聖律皇国セレスティア。",
-            )
+            if finished {
+                let allen = if game.memories == MEMORIES.len() {
+                    "アレンは父の言葉と、炉番たちの名を村に刻んだ。"
+                } else {
+                    "アレンは旅で知った父の働きと、炉番たちの名を刻んだ。"
+                };
+                (
+                    "残響のアルカディア　完",
+                    GOLD,
+                    allen,
+                    "リリスは、旅の日付を自分の手記に書いた。",
+                )
+            } else {
+                (
+                    "第一章　ノクス　完",
+                    GOLD,
+                    "救助の記録は、霧灯の港に残った。",
+                    "二人の次の目的地は聖律皇国セレスティア。",
+                )
+            }
         } else {
             (
                 "旅の終わり",
@@ -499,7 +548,9 @@ impl Frame {
             205,
             10,
             GOLD,
-            if won {
+            if finished {
+                "決定　列島を巡る"
+            } else if won {
                 "決定　次の航路へ"
             } else {
                 "Enter　題名へ"

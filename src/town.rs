@@ -124,7 +124,7 @@ pub(crate) fn plan(index: usize) -> &'static Plan {
 }
 pub(crate) type Progress = [[State; 5]; COUNT];
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum State {
     #[default]
     New,
@@ -215,6 +215,19 @@ pub(crate) struct Town {
 }
 
 impl Town {
+    pub(crate) fn tracking_side(&self) -> bool {
+        self.track_side
+    }
+
+    pub(crate) fn restore_exploration(&mut self, tracked: usize, side: bool, low_tide: bool) {
+        self.tracked = tracked;
+        self.track_side = side;
+        self.low_tide = low_tide && self.index == 1;
+        if self.low_tide {
+            self.landscape.set_low_tide(true);
+        }
+    }
+
     pub(crate) fn new(index: usize, states: &[State; 5]) -> Self {
         let plan = &NOX[index];
         let mut landscape = map::TownMap::new(plan, index);

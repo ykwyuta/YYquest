@@ -154,4 +154,13 @@ fn main() {
     ] {
         export(&load(path), name, art_sizes::PORTRAIT, &out);
     }
+    let app_icon = load("assets/app-icon.png");
+    for side in [16_u32, 32] {
+        let resized = imageops::resize(&app_icon, side, side, imageops::FilterType::Lanczos3);
+        let bgra: Vec<u8> = resized
+            .pixels()
+            .flat_map(|p| [p[2], p[1], p[0], p[3]])
+            .collect();
+        fs::write(out.join(format!("app-icon-{side}.bgra")), bgra).unwrap();
+    }
 }

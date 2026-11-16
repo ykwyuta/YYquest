@@ -166,6 +166,22 @@ press(enter, left, down, down, ...Array(10).fill(left), up, up, enter, enter);
 has("灰灯りの村");
 has("精霊　ガウェイン旧宅へ");
 
+const savedSize = wasm.checkpoint_size();
+assert.ok(savedSize > 0);
+const checkpoint = new Uint8Array(wasm.memory.buffer, wasm.checkpoint_ptr(), savedSize).slice();
+const resumed = await WebAssembly.instantiate(binary, imports);
+wasm = resumed.instance.exports;
+const destination = wasm.prepare_save_load(checkpoint.length);
+assert.ok(destination > 0);
+new Uint8Array(wasm.memory.buffer, destination, checkpoint.length).set(checkpoint);
+assert.equal(wasm.offer_continue(), 1);
+wasm.draw();
+has("つづきから");
+press(enter);
+has("灰灯りの村");
+has("精霊　ガウェイン旧宅へ");
+assert.equal(wasm.take_sound(), 1);
+
 const restarted = await WebAssembly.instantiate(binary, imports);
 wasm = restarted.instance.exports;
 wasm.draw();
@@ -190,4 +206,4 @@ has("寄合小屋へ");
 press(escape, escape, escape);
 has("デバッグモード");
 
-console.log("Wasm smoke passed (title, island, town story, tutorial, journal, companion, Nox start, debug menu)");
+console.log("Wasm smoke passed (title, island, town story, tutorial, journal, companion, Nox start, save and resume, debug menu)");

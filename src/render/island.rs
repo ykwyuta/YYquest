@@ -11,7 +11,12 @@ use crate::{
 };
 
 impl Frame {
-    pub(super) fn draw_island(&mut self, island: &Island, guide_site: Option<usize>) {
+    pub(super) fn draw_island(
+        &mut self,
+        island: &Island,
+        guide_site: Option<usize>,
+        event_action: Option<&str>,
+    ) {
         let player = (island.x, island.y);
         let view = View::following(self.width as i32, player, (WIDTH, HEIGHT), &island.walk);
         let (title, _) = island.region.caption();
@@ -81,10 +86,10 @@ impl Frame {
             &island.walk,
         );
         let destination = guide_site.map(|index| &island.settlements()[index]);
-        if let Some(destination) = destination {
+        let remaining = destination.and_then(|destination| {
             self.draw_guide(
                 Guidance {
-                    area: Area::Nox,
+                    area: Area::Island(island.region),
                     from: (island.x, island.y),
                     to: destination.door,
                     size: (WIDTH, HEIGHT),
@@ -93,8 +98,8 @@ impl Frame {
                 |(x, y)| matches!(island.tile(x, y), Tile::Road | Tile::Bridge | Tile::Plaza),
                 |at| view.feet(at),
                 view.clip,
-            );
-        }
+            )
+        });
 
         self.panel(view.left - 1, 191, view.width() + 2, 46);
         let site = island.current_landmark();
@@ -151,7 +156,9 @@ impl Frame {
             }
         }
         self.label(24, 224, 9, MIST, "J 荷袋");
-        if island.region == Region::Nox
+        if let Some(action) = event_action {
+            self.label(126, 224, 9, MINT, action);
+        } else if island.region == Region::Nox
             && site.is_some_and(|site| matches!(site.kind, Kind::Town | Kind::Harbor))
         {
             self.label(126, 224, 9, MINT, "Enter / Z  入る");
@@ -163,7 +170,10 @@ impl Frame {
             224,
             9,
             MINT,
-            format!("{:02} / {:02}", island.x + 1, island.y + 1),
+            match remaining.filter(|&distance| distance > 0) {
+                Some(distance) => format!("あと{distance}歩"),
+                None => format!("{:02} / {:02}", island.x + 1, island.y + 1),
+            },
         );
     }
 

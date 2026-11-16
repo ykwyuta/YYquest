@@ -1,6 +1,7 @@
 use crate::{
-    campaign::{Campaign, ChapterBeat},
+    campaign::{Campaign, ChapterBeat, VoyageBeat},
     economy::Service,
+    fort::Fort,
     game::Key,
     island::{Island, Kind, Tile},
     town::{self, Town, Travel},
@@ -24,7 +25,7 @@ pub(crate) const MAP: [&[u8; 24]; 15] = [
     b"........................",
 ];
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum Region {
     Celestia,
     Sylva,
@@ -89,6 +90,16 @@ impl Region {
             Self::Vulcan => ("機工連邦ヴァルカン", "火山の裾野で蒸気と魔導炉がうなる。"),
         }
     }
+
+    pub(crate) fn short_name(self) -> &'static str {
+        match self {
+            Self::Celestia => "セレスティア",
+            Self::Sylva => "シルヴァ",
+            Self::Liberta => "リベルタ",
+            Self::Nox => "ノクス",
+            Self::Vulcan => "ヴァルカン",
+        }
+    }
 }
 
 pub(crate) struct WorldMap {
@@ -97,6 +108,7 @@ pub(crate) struct WorldMap {
     pub(crate) town: Option<Town>,
     pub(crate) town_progress: town::Progress,
     pub(crate) campaign: Campaign,
+    pub(crate) fort: Option<Fort>,
 }
 
 impl WorldMap {
@@ -107,6 +119,7 @@ impl WorldMap {
             town: None,
             town_progress: Default::default(),
             campaign: Campaign::default(),
+            fort: None,
         }
     }
 
@@ -146,6 +159,13 @@ impl WorldMap {
     }
 
     pub(crate) fn guide_site(&self, island: &Island) -> Option<usize> {
+        if let Some(beat) = self
+            .campaign
+            .voyage()
+            .filter(|beat| beat.region == island.region)
+        {
+            return Some(beat.site);
+        }
         if island.region != Region::Nox {
             return None;
         }
@@ -168,6 +188,14 @@ impl WorldMap {
                 (!active, (x - island.x).abs() + (y - island.y).abs())
             })
             .map(|(index, _)| index)
+    }
+
+    pub(crate) fn voyage_here(&self) -> Option<&'static VoyageBeat> {
+        let beat = self.campaign.voyage()?;
+        let island = self.island.as_ref()?;
+        (island.region == beat.region
+            && (island.x, island.y) == island.settlements()[beat.site].door)
+            .then_some(beat)
     }
 
     pub(crate) fn town_input(&mut self, key: Key) -> Option<Service> {
@@ -208,17 +236,9 @@ impl WorldMap {
             .then_some(step)
     }
 
-    pub(crate) fn chapter_input(&mut self, key: Key) -> bool {
-        if self.campaign.reading {
-            match key {
-                Key::Confirm => self.campaign.advance(),
-                Key::Map | Key::Back => self.campaign.reading = false,
-                _ => {}
-            }
-            return true;
-        }
+    pub(crate) fn enter_fort(&mut self, key: Key) -> bool {
         if key == Key::Confirm && self.chapter_at_ruin().is_some() {
-            self.campaign.reading = true;
+            self.fort = Some(Fort::new(self.campaign.fort_cleared));
             return true;
         }
         false

@@ -1,7 +1,7 @@
 use crate::{game::MAX_HP, world_map::Region};
 use std::collections::HashSet;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum Item {
     RustySword,
     AshHerb,
@@ -265,6 +265,7 @@ impl Menu {
     }
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Goods {
     pub(crate) coins: u32,
     pub(crate) hp: u8,
@@ -278,6 +279,25 @@ pub(crate) struct Goods {
 }
 
 impl Goods {
+    pub(crate) fn valid(&self) -> bool {
+        let equipped = |item, kind: fn(Kind) -> bool| self.count(item) == 1 && kind(item.data().1);
+        self.hp > 0
+            && self.hp <= MAX_HP
+            && self.count(RustySword) == 1
+            && Item::ALL.into_iter().all(|item| {
+                let limit = match item.data().1 {
+                    Kind::Weapon(_) | Kind::Armor(_) | Kind::Charm(_) => 1,
+                    _ => 99,
+                };
+                self.count(item) <= limit
+            })
+            && equipped(self.weapon, |kind| matches!(kind, Kind::Weapon(_)))
+            && self.armor.is_none_or(|item| equipped(item, |kind| matches!(kind, Kind::Armor(_))))
+            && self.charm.is_none_or(|item| equipped(item, |kind| matches!(kind, Kind::Charm(_))))
+            && self.picked_at.iter().flatten().all(|&step| step <= self.steps)
+            && self.rewarded.iter().all(|&(_, index)| index < 135)
+    }
+
     pub(crate) fn new() -> Self {
         let mut goods = Self {
             coins: 24,

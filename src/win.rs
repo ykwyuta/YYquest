@@ -1,7 +1,10 @@
 use std::{
     cell::{Cell, RefCell},
     ffi::c_void,
+    fs,
+    io::{self, Read, Write},
     mem::{size_of, zeroed},
+    path::PathBuf,
     ptr::{null, null_mut},
     time::Instant,
 };
@@ -20,9 +23,14 @@ use windows_sys::Win32::{
 };
 
 use yyquest::{
-    game::{Game, Key},
+    game::{Game, Key, SoundCue},
     render::{Frame, BUFFER_HEIGHT, BUFFER_WIDTH, HEIGHT, WIDTH},
 };
+
+#[link(name = "winmm")]
+extern "system" {
+    fn PlaySoundW(sound: *const u16, module: *mut c_void, flags: u32) -> i32;
+}
 
 const CLASS: windows_sys::core::PCWSTR = windows_sys::w!("YYquest");
 const TRAFFIC_TIMER: usize = 1;
@@ -48,6 +56,141 @@ thread_local! {
     static MOUSE_DIRECTION: Cell<Option<u32>> = const { Cell::new(None) };
     static LAST_FRAME: Cell<Instant> = Cell::new(Instant::now());
     static SESSION: RefCell<(Game, Frame)> = RefCell::new((Game::new(), Frame::new()));
+    static LAST_SAVE: RefCell<Option<Vec<u8>>> = const { RefCell::new(None) };
+    static SAVE_FAILED: Cell<bool> = const { Cell::new(false) };
+    static SOUND_ENABLED: Cell<bool> = const { Cell::new(true) };
+}
+
+fn play_game_sound() {
+    use std::sync::OnceLock;
+    static SOUNDS: OnceLock<[Vec<u16>; 4]> = OnceLock::new();
+    const SND_ASYNC: u32 = 0x0001;
+    const SND_NODEFAULT: u32 = 0x0002;
+    const SND_MEMORY: u32 = 0x0004;
+    const SND_NOSTOP: u32 = 0x0010;
+
+    let cue = SESSION.with(|session| session.borrow_mut().0.take_sound());
+    let Some(cue) = cue.filter(|_| SOUND_ENABLED.get()) else {
+        return;
+    };
+    let sounds = SOUNDS.get_or_init(|| {
+        [
+            make_sound(&[587]),
+            make_sound(&[196, 147]),
+            make_sound(&[523, 659, 784]),
+            make_sound(&[392, 523, 659, 784]),
+        ]
+    });
+    let index = match cue {
+        SoundCue::Confirm => 0,
+        SoundCue::Hit => 1,
+        SoundCue::Victory => 2,
+        SoundCue::Chapter => 3,
+    };
+    unsafe {
+        let flags = SND_ASYNC
+            | SND_MEMORY
+            | SND_NODEFAULT
+            | if cue == SoundCue::Confirm {
+                SND_NOSTOP
+            } else {
+                0
+            };
+        PlaySoundW(sounds[index].as_ptr(), null_mut(), flags);
+    }
+}
+
+fn make_sound(notes: &[u32]) -> Vec<u16> {
+    const RATE: u32 = 16_000;
+    const NOTE_SAMPLES: u32 = 1_200;
+    let size = notes.len() as u32 * NOTE_SAMPLES * 2;
+    let mut wave = Vec::new();
+    wave.extend(b"RIFF");
+    wave.extend((size + 36).to_le_bytes());
+    wave.extend(b"WAVEfmt ");
+    wave.extend(16_u32.to_le_bytes());
+    wave.extend(1_u16.to_le_bytes());
+    wave.extend(1_u16.to_le_bytes());
+    wave.extend(RATE.to_le_bytes());
+    wave.extend((RATE * 2).to_le_bytes());
+    wave.extend(2_u16.to_le_bytes());
+    wave.extend(16_u16.to_le_bytes());
+    wave.extend(b"data");
+    wave.extend(size.to_le_bytes());
+    for &hz in notes {
+        for sample in 0..NOTE_SAMPLES {
+            let phase = (sample * hz % RATE) as f32 / RATE as f32;
+            let envelope =
+                (sample as f32 / 60.0).min(1.0) * (1.0 - sample as f32 / NOTE_SAMPLES as f32);
+            let amplitude = ((1.0 - 4.0 * (phase - 0.5).abs()) * envelope * 2_000.0) as i16;
+            wave.extend(amplitude.to_le_bytes());
+        }
+    }
+    wave.chunks_exact(2)
+        .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+        .collect()
+}
+
+fn save_path() -> io::Result<PathBuf> {
+    std::env::var_os("LOCALAPPDATA")
+        .filter(|path| !path.is_empty())
+        .map(|path| PathBuf::from(path).join("YYquest").join("adventure.json"))
+        .ok_or_else(|| io::Error::other("LOCALAPPDATA is unavailable"))
+}
+
+fn load_adventure() -> io::Result<()> {
+    let file = match fs::File::open(save_path()?) {
+        Ok(file) => file,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    let mut bytes = Vec::new();
+    file.take(Game::MAX_SAVE_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)?;
+    if !SESSION.with(|session| session.borrow_mut().0.offer_continue(&bytes)) {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid save"));
+    }
+    LAST_SAVE.replace(Some(bytes));
+    Ok(())
+}
+
+fn write_adventure(bytes: &[u8]) -> io::Result<()> {
+    let path = save_path()?;
+    fs::create_dir_all(path.parent().unwrap())?;
+    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    let result = (|| {
+        let mut file = fs::File::create(&temporary)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        fs::rename(&temporary, &path)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(temporary);
+    }
+    result
+}
+
+fn save_adventure(window: HWND) {
+    let Some(bytes) = SESSION.with(|session| session.borrow().0.checkpoint()) else {
+        return;
+    };
+    if LAST_SAVE.with(|last| last.borrow().as_deref() == Some(bytes.as_slice())) {
+        return;
+    }
+    if write_adventure(&bytes).is_ok() {
+        LAST_SAVE.replace(Some(bytes));
+        SAVE_FAILED.set(false);
+    } else if !SAVE_FAILED.replace(true) {
+        unsafe {
+            MessageBoxW(
+                window,
+                windows_sys::w!("冒険の記録を保存できませんでした。"),
+                CLASS,
+                MB_OK | MB_ICONWARNING,
+            );
+        }
+    }
 }
 
 struct Layout {
@@ -108,13 +251,35 @@ impl Layout {
     }
 }
 
+unsafe fn create_app_icon(
+    instance: windows_sys::Win32::Foundation::HINSTANCE,
+    side: i32,
+    bgra: &[u8],
+) -> HICON {
+    let and_mask = vec![0_u8; ((side as usize + 7) / 8) * side as usize];
+    CreateIcon(
+        instance,
+        side,
+        side,
+        1,
+        32,
+        and_mask.as_ptr(),
+        bgra.as_ptr(),
+    )
+}
+
 pub fn run() {
+    const ICON_16: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/app-icon-16.bgra"));
+    const ICON_32: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/app-icon-32.bgra"));
     unsafe {
         let instance = GetModuleHandleW(null());
+        let big_icon = create_app_icon(instance, 32, ICON_32);
+        let small_icon = create_app_icon(instance, 16, ICON_16);
         let class = WNDCLASSW {
             style: CS_HREDRAW | CS_VREDRAW,
             lpfnWndProc: Some(window_proc),
             hInstance: instance,
+            hIcon: big_icon,
             hCursor: LoadCursorW(null_mut(), IDC_ARROW),
             lpszClassName: CLASS,
             ..zeroed()
@@ -139,6 +304,23 @@ pub fn run() {
         );
         if window.is_null() {
             return;
+        }
+        if !small_icon.is_null() {
+            SendMessageW(
+                window,
+                WM_SETICON,
+                ICON_SMALL as WPARAM,
+                small_icon as LPARAM,
+            );
+        }
+
+        if load_adventure().is_err() {
+            MessageBoxW(
+                window,
+                windows_sys::w!("冒険の記録を読み込めませんでした。"),
+                title,
+                MB_OK | MB_ICONWARNING,
+            );
         }
 
         SetTimer(window, TRAFFIC_TIMER, TRAFFIC_INTERVAL, None);
@@ -193,8 +375,17 @@ unsafe extern "system" fn window_proc(
         }
         WM_KEYDOWN => {
             let code = wparam as u32;
-            if Key::from_code(code).is_some() {
+            if code == 0x71 && lparam & (1 << 30) == 0 {
+                if SOUND_ENABLED.replace(!SOUND_ENABLED.get()) {
+                    PlaySoundW(null(), null_mut(), 0);
+                }
+                return 0;
+            }
+            if let Some(key) = Key::from_code(code) {
                 let repeat = lparam & (1 << 30) != 0;
+                if !repeat && key == Key::Confirm {
+                    save_adventure(window);
+                }
                 if !repeat
                     && SESSION.with(|session| {
                         let mut session = session.borrow_mut();
@@ -203,6 +394,10 @@ unsafe extern "system" fn window_proc(
                     })
                 {
                     InvalidateRect(window, null(), 0);
+                    play_game_sound();
+                    if matches!(key, Key::Confirm | Key::Back | Key::Map | Key::Journal) {
+                        save_adventure(window);
+                    }
                 }
                 return 0;
             }
@@ -224,7 +419,7 @@ unsafe extern "system" fn window_proc(
         }
         WM_TIMER if wparam == GAMEPAD_TIMER => {
             if GetForegroundWindow() == window {
-                if poll_gamepad() {
+                if poll_gamepad(window) {
                     InvalidateRect(window, null(), 0);
                 }
             } else {
@@ -264,6 +459,7 @@ unsafe extern "system" fn window_proc(
             PostQuitMessage(0);
             return 0;
         }
+        WM_CLOSE => save_adventure(window),
         _ => {}
     }
     DefWindowProcW(window, message, wparam, lparam)
@@ -276,7 +472,7 @@ unsafe fn release_mouse(window: HWND) {
     }
 }
 
-unsafe fn poll_gamepad() -> bool {
+unsafe fn poll_gamepad(window: HWND) -> bool {
     let mut state: XINPUT_STATE = zeroed();
     let buttons = (0..4)
         .find(|&index| XInputGetState(index, &mut state) == 0)
@@ -284,6 +480,10 @@ unsafe fn poll_gamepad() -> bool {
     let previous = GAMEPAD_BUTTONS.replace(buttons);
     if buttons == previous {
         return false;
+    }
+    let pressed = buttons & !previous;
+    if pressed & XINPUT_GAMEPAD_A != 0 {
+        save_adventure(window);
     }
     SESSION.with(|session| {
         let mut session = session.borrow_mut();
@@ -305,6 +505,10 @@ unsafe fn poll_gamepad() -> bool {
             }
         }
     });
+    play_game_sound();
+    if pressed & (XINPUT_GAMEPAD_A | XINPUT_GAMEPAD_B) != 0 {
+        save_adventure(window);
+    }
     true
 }
 
@@ -460,6 +664,7 @@ mod tests {
 
     #[test]
     fn dpad_click_and_keyboard_arrows_move_through_the_same_window() {
+        SOUND_ENABLED.set(false);
         for (width, height) in [(800, 600), (1300, 600), (320, 260)] {
             let layout = Layout::new(RECT {
                 right: width,
@@ -490,8 +695,11 @@ mod tests {
                 null(),
             );
             assert!(!window.is_null());
-            window_proc(window, WM_KEYDOWN, 13, 0);
-            window_proc(window, WM_KEYDOWN, 13, 0);
+            SESSION.with(|session| {
+                let game = &mut session.borrow_mut().0;
+                game.input(Key::Confirm);
+                game.input(Key::Confirm);
+            });
 
             let mut client = RECT::default();
             GetClientRect(window, &mut client);
