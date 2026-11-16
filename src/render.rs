@@ -434,13 +434,13 @@ impl Frame {
             self.label(89, 136, 9, MINT, tip);
         } else if battle.enemy.tactic() == Tactic::Charge {
             let tip = if battle.charged {
-                "大技の構え！　精霊共鳴か防御でしのぐ"
+                "大技の構え！　精霊共鳴か防御で防ごう"
             } else {
-                "敵が間合いを測っている"
+                "敵は様子をうかがっている"
             };
             self.label(89, 136, 9, MINT, tip);
         } else if battle.enemy.tactic() == Tactic::Shell {
-            self.label(89, 136, 9, MINT, "硬い殻が剣を弾く。魔法や共鳴が有効");
+            self.label(89, 136, 9, MINT, "硬い殻が剣を弾く！　魔法や精霊共鳴が有効");
         }
         self.panel(15, 155, 290, 74);
         if let Some([first, second]) = &battle.log {
@@ -474,7 +474,7 @@ impl Frame {
             }
             let help = match battle.selected {
                 1 if game.memories > 0 => "大きな一撃。記憶をひとつ失う。",
-                1 => "燃やせる記憶が残っていない。",
+                1 => "使える記憶がもう残っていない。",
                 2 if game.can_resonate() => "リリスが森の精霊を呼ぶ。",
                 2 => "リリスが仲間になると使える。",
                 3 => "敵の反撃を弱める。",
@@ -503,22 +503,22 @@ impl Frame {
             self.art(lilith(Facing::South, Pose::Standing), 155, 74, 56);
             if finished {
                 let allen = if game.memories == MEMORIES.len() {
-                    "アレンは父の言葉と、炉番たちの名を村に刻んだ。"
+                    "アレンは父の思いと炉番たちの名を碑に刻んだ。"
                 } else {
-                    "アレンは旅で知った父の働きと、炉番たちの名を刻んだ。"
+                    "アレンは父の働きと炉番たちの名を碑に刻んだ。"
                 };
                 (
                     "残響のアルカディア　完",
                     GOLD,
                     allen,
-                    "リリスは、旅の日付を自分の手記に書いた。",
+                    "リリスは旅の日付を自分の手記の最初に書いた。",
                 )
             } else {
                 (
                     "第一章　ノクス　完",
                     GOLD,
-                    "救助の記録は、霧灯の港に残った。",
-                    "二人の次の目的地は聖律皇国セレスティア。",
+                    "父が残した救助の記録は霧灯の港へ届いた。",
+                    "二人は次の島・聖律皇国セレスティアへ向かう。",
                 )
             }
         } else {

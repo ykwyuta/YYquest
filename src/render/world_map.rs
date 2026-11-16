@@ -26,7 +26,7 @@ impl Frame {
             let action = if world.chapter_at_ruin().is_some() {
                 Some("決定　砦の中へ")
             } else if voyage.is_some() {
-                Some("決定　本編イベント")
+                Some("決定　話を聞く")
             } else {
                 None
             };
@@ -81,7 +81,7 @@ impl Frame {
                 223,
                 9,
                 MINT,
-                format!("本編の目的地　{site}（{}）", beat.region.short_name()),
+                format!("次の目的地：{site}（{}）", beat.region.short_name()),
             );
         } else {
             self.label(23, 223, 10, IVORY, detail);
@@ -97,7 +97,7 @@ impl Frame {
         if beat.battle() || beat.epilogue() {
             self.labels.clear();
             self.landscape(0, 0, self.width as i32, 240);
-            self.label(x + 8, 9, 9, MIST, "虚無の海　調律の祭壇");
+            self.label(x + 8, 9, 9, MIST, "虚無の海・調律の祭壇");
         }
         self.panel(x, 30, width, 158);
         self.label(x + 10, 40, 12, GOLD, beat.title);
@@ -110,7 +110,7 @@ impl Frame {
                         148,
                         9,
                         MINT,
-                        "家族宛ての封書は、聖堂に預けたままにした。",
+                        "家族宛ての封書は、本人の願いどおり聖堂に預けておいた。",
                     );
                 }
             }
@@ -147,7 +147,7 @@ impl Frame {
             }
         }
         let action = if beat.battle() {
-            "決定　封印を守る"
+            "決定　魔物に挑む"
         } else {
             "▼ 決定"
         };

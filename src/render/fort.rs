@@ -7,7 +7,7 @@ use crate::{
 impl Frame {
     pub(super) fn draw_fort(&mut self, fort: &Fort, cleared: bool, beat: &ChapterBeat) {
         let left = (self.width as i32 - 286) / 2;
-        self.label(left, 7, 12, GOLD, "天墜ち砦跡　封印庫");
+        self.label(left, 7, 12, GOLD, "天墜ち砦跡・封印庫");
         self.label(left + 205, 9, 9, MIST, "M / Esc  外へ");
         for (row, tiles) in fort::MAP.iter().enumerate() {
             for (col, tile) in tiles.iter().copied().enumerate() {
@@ -40,11 +40,11 @@ impl Frame {
         );
         self.panel(left, 188, 286, 43);
         let goal = if cleared {
-            "奥の記録棚を調べ、救助の証言を書き写す。"
+            "奥の記録棚を調べ、救助の記録を書き写そう。"
         } else if fort.gate {
-            "霧の奥へ進み、記録棚への道を開く。"
+            "霧の魔物を退けて、記録棚への道を開こう。"
         } else {
-            "拓本を手に、入口の近くにある信号灯を調べる。"
+            "拓本を頼りに、入口近くの信号灯を調べよう。"
         };
         self.label(left + 9, 195, 10, MINT, goal);
         self.label(left + 9, 214, 9, MIST, "決定　調べる　　J　持ち物");
@@ -52,13 +52,13 @@ impl Frame {
             Panel::Walk => {}
             Panel::Lamps(selected) => {
                 self.panel(left + 10, 35, 266, 139);
-                self.label(left + 22, 44, 12, GOLD, "救助船を呼んだのは、いくつの灯？");
+                self.label(left + 22, 44, 12, GOLD, "救助船を呼ぶ合図は、いくつの灯？");
                 self.label(
                     left + 22,
                     65,
                     10,
                     IVORY,
-                    "拓本には、削られた記録の脇に灯の印が残る。",
+                    "拓本には、削られた記録の脇に灯の印があった。",
                 );
                 for (index, label) in ["一つ灯す", "二つ灯す", "三つ灯す"].into_iter().enumerate()
                 {
@@ -81,7 +81,7 @@ impl Frame {
                     72,
                     10,
                     IVORY,
-                    "三灯を見た港の救難艇が、砦の浜へ来た。",
+                    "三つの灯を見た港の救難艇が浜へ来た。",
                 );
                 for (index, label) in ["救難艇で港へ戻る", "島の街道を歩いて戻る"]
                     .into_iter()
@@ -106,8 +106,8 @@ impl Frame {
                 } else {
                     let text = match panel {
                         Panel::Wrong => "扉は動かない。港の信号台で聞いた合図を思い出そう。",
-                        Panel::Opened => "三つの灯がともり、拓本と同じ印のある扉が開いた。",
-                        Panel::Recovered => "リリスが入口まで運び、手当てをした。扉は開いている。",
+                        Panel::Opened => "三つの灯がともると、拓本と同じ印の刻まれた扉が開いた。",
+                        Panel::Recovered => "リリスがアレンを入口まで運び、手当てをした。奥への扉は開いたままだ。",
                         _ => unreachable!(),
                     };
                     self.dialogue_content(

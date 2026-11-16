@@ -31,7 +31,7 @@ const CHAPTER: [ChapterBeat; 6] = [
     },
     ChapterBeat {
         site: 7, place: Some(3), title: "二つの旗、ひとつの門",
-        text: "救助船の出航を許したのは私だ。この鍵と拓本を持って天墜ち砦へ。奥で記録を探してくれ。霧が濃い。傷薬が要るなら港の商いか、灰灯りの村の炊事場を頼るといい。",
+        text: "救助船の出航を許したのは私だ。この鍵と拓本を持って、天墜ち砦の奥で記録を探してくれ。砦の霧は濃いから、傷薬が要るなら港のよろず屋か灰灯りの村の炊事場で備えるといい。",
         delivery: Delivery::spoken("バルド", Baldo, Sad),
     },
     ChapterBeat {
