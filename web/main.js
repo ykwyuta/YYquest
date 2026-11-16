@@ -8,6 +8,7 @@ const controls = document.querySelector("#controls");
 const stage = document.querySelector(".game-stage");
 const touchLayout = document.querySelector("#touch-layout");
 const layoutPreference = "yyquest-touch-controls";
+const desktopControls = matchMedia("(hover: hover) and (pointer: fine) and (min-width: 701px)");
 const refreshButton = document.querySelector("#cache-refresh");
 const mapButton = document.querySelector("#map-control");
 const refreshParam = "_yyrefresh";
@@ -24,6 +25,7 @@ const keyboardSource = 1;
 const gamepadSource = 2;
 const touchDirections = new Map();
 const directions = new Set([37, 38, 39, 40, 65, 68, 83, 87]);
+let preferredLayout;
 
 function setControlLayout(layout) {
   stage.dataset.controls = layout;
@@ -31,17 +33,25 @@ function setControlLayout(layout) {
 }
 
 try {
-  if (localStorage.getItem(layoutPreference) === "outside") setControlLayout("outside");
+  const saved = localStorage.getItem(layoutPreference);
+  if (saved === "outside" || saved === "overlay") preferredLayout = saved;
 } catch {
   // Touch controls still work when browser storage is unavailable.
 }
 
-touchLayout.addEventListener("click", () => {
-  const layout = stage.dataset.controls === "outside" ? "overlay" : "outside";
-  setControlLayout(layout);
+function applyControlLayout() {
+  setControlLayout(preferredLayout ?? (desktopControls.matches ? "outside" : "overlay"));
   resizeViewport();
+}
+
+applyControlLayout();
+desktopControls.addEventListener("change", applyControlLayout);
+
+touchLayout.addEventListener("click", () => {
+  preferredLayout = stage.dataset.controls === "outside" ? "overlay" : "outside";
+  applyControlLayout();
   try {
-    localStorage.setItem(layoutPreference, layout);
+    localStorage.setItem(layoutPreference, preferredLayout);
   } catch {
     // Keep the selection for the current visit.
   }
@@ -96,7 +106,7 @@ function pollGamepad() {
       if (directions.has(code)) pressDirection(code, gamepadSource);
       else sendKey(code);
     } else if (!pressed && wasPressed && directions.has(code)) {
-      wasm.release_direction(code, gamepadSource);
+      wasm.release_direction?.(code, gamepadSource);
     }
   }
   gamepadButtons = held;
@@ -189,14 +199,18 @@ refreshButton.addEventListener("click", async () => {
   }
 });
 
-function sendKey(key) {
+function sendKey(key, repeat = false) {
   if (!wasm || refreshButton.disabled) return;
-  wasm.key(key, false);
+  wasm.key(key, repeat);
   updateControls();
 }
 
 function pressDirection(code, source) {
   if (!wasm || refreshButton.disabled) return;
+  if (!wasm.press_direction) {
+    sendKey(code);
+    return;
+  }
   wasm.press_direction(code, source);
   updateControls();
 }
@@ -204,7 +218,7 @@ function pressDirection(code, source) {
 function clearHeldDirections() {
   touchDirections.clear();
   gamepadButtons = 0;
-  wasm?.clear_held_direction();
+  wasm?.clear_held_direction?.();
 }
 
 function updateControls() {
@@ -237,17 +251,20 @@ refreshButton.hidden = false;
 window.addEventListener("keydown", (event) => {
   if (!wasm || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
   if (event.target instanceof HTMLButtonElement && ["Enter", "Space"].includes(event.code)) return;
-  const key = keys.get(event.code);
+  const key = keys.get(event.code) ?? keys.get(event.key);
   if (key === undefined) return;
   event.preventDefault();
-  if (event.repeat) return;
+  if (event.repeat) {
+    if (!wasm.press_direction && directions.has(key)) sendKey(key, true);
+    return;
+  }
   if (directions.has(key)) pressDirection(key, keyboardSource);
   else sendKey(key);
 });
 
 window.addEventListener("keyup", (event) => {
-  const key = keys.get(event.code);
-  if (directions.has(key)) wasm?.release_direction(key, keyboardSource);
+  const key = keys.get(event.code) ?? keys.get(event.key);
+  if (directions.has(key)) wasm?.release_direction?.(key, keyboardSource);
 });
 
 window.addEventListener("blur", clearHeldDirections);
@@ -270,7 +287,7 @@ function releasePointer(event) {
   const code = touchDirections.get(event.pointerId);
   if (code === undefined) return;
   touchDirections.delete(event.pointerId);
-  wasm?.release_direction(code, 3 + event.pointerId);
+  wasm?.release_direction?.(code, 3 + event.pointerId);
 }
 
 for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {

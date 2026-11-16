@@ -78,91 +78,88 @@ button:active { background: #6f573bd9; }
 button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
 [hidden] { display: none !important; }
 
-@media (any-pointer: coarse), (max-width: 700px) {
-  .game-stage {
-    --key: clamp(44px, 10dvh, 54px);
-    --pad-gap: clamp(3px, 1.1vw, 6px);
-  }
-
-  #controls:not([hidden]) {
-    grid-area: game;
-    z-index: 1;
-    display: flex;
-    justify-content: space-between;
-    align-items: end;
-    gap: 4px;
-    width: var(--screen-width);
-    padding: clamp(4px, 1.5vw, 12px);
-    pointer-events: none;
-  }
-  #controls button {
-    inline-size: var(--key);
-    block-size: var(--key);
-    border-radius: 50%;
-    padding: 0;
-    pointer-events: auto;
-    text-shadow: 0 1px 2px #090a15;
-    user-select: none;
-  }
-  .directions {
-    display: grid;
-    grid-template-areas: ". up ." "left down right";
-    grid-template-columns: repeat(3, var(--key));
-    grid-template-rows: repeat(2, var(--key));
-    gap: var(--pad-gap);
-    font-size: 20px;
-  }
-  #controls .directions button { touch-action: none; }
-  .game-stage[data-reading="true"] .directions { visibility: hidden; }
-  .up { grid-area: up; }
-  .left { grid-area: left; }
-  .down { grid-area: down; }
-  .right { grid-area: right; }
-  .actions {
-    display: grid;
-    grid-template:
-      "map confirm" var(--key)
-      "journal confirm" var(--key)
-      "layout layout" auto
-      / var(--key) calc(var(--key) + 8px);
-    gap: var(--pad-gap);
-    align-items: end;
-    font-size: 12px;
-  }
-  #map-control { grid-area: map; }
-  .journal { grid-area: journal; }
-  #controls #touch-layout {
-    grid-area: layout;
-    inline-size: 100%;
-    block-size: auto;
-    padding: 3px;
-    border-radius: 999px;
-    font-size: 11px;
-  }
-  #controls .confirm {
-    grid-area: confirm;
-    inline-size: calc(var(--key) + 8px);
-    block-size: calc(var(--key) + 8px);
-    border-color: #edc690bd;
-    background: #473827c2;
-    color: #fff1d3;
-    font-size: 14px;
-  }
-  #controls .confirm:active { background: #85603be6; }
-
-  .game-stage[data-controls="outside"]:has(#controls:not([hidden])) {
-    grid-template:
-      "directions game actions" minmax(0, 1fr)
-      / auto minmax(0, 1fr) auto;
-    gap: 8px;
-  }
-  .game-stage[data-controls="outside"] #controls:not([hidden]) { display: contents; }
-  .game-stage[data-controls="outside"] .directions { grid-area: directions; }
-  .game-stage[data-controls="outside"] .actions { grid-area: actions; }
+.game-stage {
+  --key: clamp(44px, 10dvh, 54px);
+  --pad-gap: clamp(3px, 1.1vw, 6px);
 }
 
-@media (orientation: portrait) and (any-pointer: coarse),
-       (orientation: portrait) and (max-width: 700px) {
+#controls:not([hidden]) {
+  grid-area: game;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 4px;
+  width: var(--screen-width);
+  padding: clamp(4px, 1.5vw, 12px);
+  pointer-events: none;
+}
+#controls button {
+  inline-size: var(--key);
+  block-size: var(--key);
+  border-radius: 50%;
+  padding: 0;
+  pointer-events: auto;
+  text-shadow: 0 1px 2px #090a15;
+  user-select: none;
+}
+.directions {
+  display: grid;
+  grid-template-areas: ". up ." "left down right";
+  grid-template-columns: repeat(3, var(--key));
+  grid-template-rows: repeat(2, var(--key));
+  gap: var(--pad-gap);
+  font-size: 20px;
+}
+#controls .directions button { touch-action: none; }
+.game-stage[data-controls="overlay"][data-reading="true"] .directions { visibility: hidden; }
+.up { grid-area: up; }
+.left { grid-area: left; }
+.down { grid-area: down; }
+.right { grid-area: right; }
+.actions {
+  display: grid;
+  grid-template:
+    "map confirm" var(--key)
+    "journal confirm" var(--key)
+    "layout layout" auto
+    / var(--key) calc(var(--key) + 8px);
+  gap: var(--pad-gap);
+  align-items: end;
+  font-size: 12px;
+}
+#map-control { grid-area: map; }
+.journal { grid-area: journal; }
+#controls #touch-layout {
+  grid-area: layout;
+  inline-size: 100%;
+  block-size: auto;
+  padding: 3px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+#controls .confirm {
+  grid-area: confirm;
+  inline-size: calc(var(--key) + 8px);
+  block-size: calc(var(--key) + 8px);
+  border-color: #edc690bd;
+  background: #473827c2;
+  color: #fff1d3;
+  font-size: 14px;
+}
+#controls .confirm:active { background: #85603be6; }
+
+.game-stage[data-controls="outside"]:has(#controls:not([hidden])) {
+  grid-template:
+    "directions game actions" minmax(0, 1fr)
+    / auto minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.game-stage[data-controls="outside"] #controls:not([hidden]) { display: contents; }
+.game-stage[data-controls="outside"] .directions { grid-area: directions; }
+.game-stage[data-controls="outside"] .actions { grid-area: actions; }
+
+@media (orientation: portrait) and (pointer: coarse) {
   #rotate-tip {
     display: block;
     margin: 0 0 8px;
@@ -171,6 +168,9 @@ button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
     font-size: 12px;
   }
   #rotate-tip::before { content: "⤾"; margin-inline-end: 6px; }
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
   .game-stage { --screen-width: min(100%, 560px); }
   .game-stage[data-controls="outside"]:has(#controls:not([hidden])) {
     grid-template: "game game" auto "directions actions" auto / 1fr 1fr;
