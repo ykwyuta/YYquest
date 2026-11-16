@@ -1,3 +1,5 @@
+use crate::world_map::WorldMap;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     Up,
@@ -6,6 +8,7 @@ pub enum Key {
     Right,
     Confirm,
     Journal,
+    Map,
     Back,
 }
 
@@ -18,6 +21,7 @@ impl Key {
             0x27 | 0x44 => Self::Right,
             0x0D | 0x20 | 0x5A => Self::Confirm,
             0x4A => Self::Journal,
+            0x4D => Self::Map,
             0x1B | 0x58 => Self::Back,
             _ => return None,
         })
@@ -50,11 +54,15 @@ pub const MAP: [&[u8; 18]; 10] = [
 pub const MAX_HP: u8 = 24;
 pub const MEMORIES: [&str; 3] = ["父が剣を研ぐ音", "帰りを待つ家の灯り", "父の最後の言葉"];
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Beast(pub(crate) crate::island::fauna::Species);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Enemy {
     Slime,
     Bat,
     Echo,
+    Beast(Beast),
 }
 
 impl Enemy {
@@ -63,6 +71,7 @@ impl Enemy {
             Self::Slime => "霧のスライム",
             Self::Bat => "洞窟コウモリ",
             Self::Echo => "忘却の獣",
+            Self::Beast(beast) => beast.0.name(),
         }
     }
 
@@ -71,6 +80,7 @@ impl Enemy {
             Self::Slime => 12,
             Self::Bat => 16,
             Self::Echo => 34,
+            Self::Beast(beast) => beast.0.combat().0,
         }
     }
 
@@ -79,6 +89,7 @@ impl Enemy {
             Self::Slime => 3,
             Self::Bat => 4,
             Self::Echo => 6,
+            Self::Beast(beast) => beast.0.combat().1,
         }
     }
 }
@@ -90,6 +101,27 @@ pub struct Battle {
     pub hp: u8,
     pub selected: usize,
     pub log: Option<[String; 2]>,
+    island: Option<IslandBattle>,
+}
+
+impl Battle {
+    fn new(enemy: Enemy) -> Self {
+        Self {
+            enemy,
+            hp: enemy.hp(),
+            selected: 0,
+            log: None,
+            island: None,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct IslandBattle {
+    creature: usize,
+    scene: Scene,
+    hp: u8,
+    memories: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -112,6 +144,8 @@ pub struct Game {
     pub journal: bool,
     pub message: Option<[&'static str; 2]>,
     pub battle: Option<Battle>,
+    pub(crate) map_open: bool,
+    pub(crate) world_map: WorldMap,
     steps: u8,
     next_bat: bool,
 }
@@ -129,6 +163,8 @@ impl Game {
             journal: false,
             message: None,
             battle: None,
+            map_open: false,
+            world_map: WorldMap::new(),
             steps: 0,
             next_bat: false,
         }
@@ -141,7 +177,41 @@ impl Game {
             .unwrap_or(b'#')
     }
 
+    pub(crate) fn can_open_map(&self) -> bool {
+        match self.scene {
+            Scene::Title | Scene::Ending => true,
+            Scene::Field => !self.journal && self.message.is_none(),
+            _ => false,
+        }
+    }
+
+    pub fn advance_traffic(&mut self, milliseconds: u32) -> bool {
+        if !self.map_open {
+            return false;
+        }
+        self.world_map
+            .island
+            .as_mut()
+            .is_some_and(|island| island.advance(milliseconds))
+    }
+
     pub fn input(&mut self, key: Key) {
+        if self.map_open {
+            if matches!(key, Key::Map | Key::Back) {
+                self.map_open = self.world_map.close_island();
+            } else if key == Key::Confirm && !self.begin_island_battle() {
+                self.world_map.confirm();
+            } else if let Some((dx, dy)) = key.direction() {
+                self.world_map.step(dx, dy);
+            }
+            return;
+        }
+
+        if key == Key::Map && self.can_open_map() {
+            self.map_open = true;
+            return;
+        }
+
         if self.journal {
             if matches!(key, Key::Journal | Key::Back | Key::Confirm) {
                 self.journal = false;
@@ -226,19 +296,64 @@ impl Game {
 
     fn start_battle(&mut self, enemy: Enemy) {
         self.steps = 0;
-        self.battle = Some(Battle {
-            enemy,
-            hp: enemy.hp(),
-            selected: 0,
-            log: None,
-        });
+        self.battle = Some(Battle::new(enemy));
         self.scene = Scene::Battle;
+    }
+
+    fn begin_island_battle(&mut self) -> bool {
+        let Some(island) = self.world_map.island.as_ref() else {
+            return false;
+        };
+        if island.current_landmark().is_some() {
+            return false;
+        }
+        let Some((creature, enemy)) = island.fauna.nearby_beast((island.x, island.y)) else {
+            return false;
+        };
+        let mut battle = Battle::new(enemy);
+        battle.island = Some(IslandBattle {
+            creature,
+            scene: self.scene,
+            hp: self.hp,
+            memories: self.memories,
+        });
+        self.battle = Some(battle);
+        self.hp = MAX_HP;
+        self.scene = Scene::Battle;
+        self.map_open = false;
+        true
+    }
+
+    fn finish_island_battle(&mut self, expedition: IslandBattle) {
+        let island = self
+            .world_map
+            .island
+            .as_mut()
+            .expect("Island remained open for its battle");
+        if self.hp == 0 {
+            island.return_to_harbor();
+        } else {
+            island.fauna.defeat(expedition.creature);
+        }
+        self.hp = expedition.hp;
+        self.memories = expedition.memories;
+        self.scene = expedition.scene;
+        self.map_open = true;
+        self.battle = None;
     }
 
     fn battle_input(&mut self, key: Key) {
         let battle = self.battle.as_mut().expect("Battle scene has an enemy");
         if battle.log.is_some() {
             if key != Key::Confirm {
+                return;
+            }
+            if let Some(expedition) = battle.island {
+                if self.hp == 0 || battle.hp == 0 {
+                    self.finish_island_battle(expedition);
+                } else {
+                    battle.log = None;
+                }
                 return;
             }
             if self.hp == 0 {
@@ -280,11 +395,15 @@ impl Game {
                     format!("{}を倒した！", battle.enemy.name())
                 } else {
                     self.hp = self.hp.saturating_sub(incoming);
-                    format!(
-                        "{}の反撃。アレンは {} のダメージ。",
-                        battle.enemy.name(),
-                        incoming
-                    )
+                    if self.hp == 0 && battle.island.is_some() {
+                        "アレンは倒れた。決定で港へ戻る。".into()
+                    } else {
+                        format!(
+                            "{}の反撃。アレンは {} のダメージ。",
+                            battle.enemy.name(),
+                            incoming
+                        )
+                    }
                 };
                 battle.log = Some([description, result]);
             }
@@ -322,6 +441,40 @@ mod tests {
         assert!(matches!(game.scene, Scene::Ending));
         assert_eq!(game.memories, 2);
         assert_eq!(game.hp, 12);
+    }
+
+    #[test]
+    fn visible_beast_battle_returns_to_the_same_place_and_preserves_the_prologue() {
+        use Key::*;
+        let mut game = Game::new();
+        game.hp = 11;
+        game.memories = 1;
+        let wolf = Enemy::Beast(Beast(crate::island::fauna::Species::new(
+            crate::world_map::Region::Nox,
+            10,
+        )));
+        press(&mut game, &[Map, Confirm]);
+        let island = game.world_map.island.as_mut().unwrap();
+        let (id, beast) = island
+            .fauna
+            .creatures()
+            .iter()
+            .enumerate()
+            .find(|(_, creature)| creature.species.enemy() == Some(wolf))
+            .unwrap();
+        let position = beast.position;
+        (island.x, island.y) = position;
+        assert!(game.battle.is_none());
+        press(&mut game, &[Confirm]);
+        assert_eq!(game.battle.as_ref().unwrap().enemy, wolf);
+        for _ in 0..3 {
+            press(&mut game, &[Confirm, Confirm]);
+        }
+        let island = game.world_map.island.as_ref().unwrap();
+        assert_eq!((island.x, island.y), position);
+        assert!(!island.fauna.creatures()[id].active);
+        assert!(matches!(game.scene, Scene::Title) && game.map_open);
+        assert_eq!((game.hp, game.memories), (11, 1));
     }
 
     #[test]

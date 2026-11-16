@@ -1,6 +1,9 @@
 use image::{imageops, RgbaImage};
 use std::{env, fs, path::PathBuf};
 
+#[path = "build/map_art.rs"]
+mod map_art;
+
 const SIZE: u32 = 64;
 
 fn load(path: &str) -> RgbaImage {
@@ -11,6 +14,14 @@ fn load(path: &str) -> RgbaImage {
 }
 
 fn export(image: &RgbaImage, name: &str, out: &std::path::Path) {
+    fs::write(
+        out.join(format!("{name}.rgba")),
+        fit_sprite(image, name).into_raw(),
+    )
+    .unwrap();
+}
+
+fn fit_sprite(image: &RgbaImage, name: &str) -> RgbaImage {
     let (mut left, mut top) = (image.width(), image.height());
     let (mut right, mut bottom) = (0, 0);
     for (x, y, pixel) in image.enumerate_pixels() {
@@ -34,11 +45,12 @@ fn export(image: &RgbaImage, name: &str, out: &std::path::Path) {
         i64::from((SIZE - width) / 2),
         i64::from(SIZE - height),
     );
-    fs::write(out.join(format!("{name}.rgba")), cell.into_raw()).unwrap();
+    cell
 }
 
 fn main() {
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    map_art::build(&out);
     let heroes = load("assets/prologue-characters.png");
     let half = heroes.width() / 2;
     for (name, offset) in [("allen", 0), ("lilith", half)] {

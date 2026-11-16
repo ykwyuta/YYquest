@@ -9,13 +9,24 @@ const decoder = new TextDecoder();
 const status = document.querySelector("#status");
 const controls = document.querySelector("#controls");
 const refreshButton = document.querySelector("#cache-refresh");
+const mapButton = document.querySelector("#map-control");
 const refreshParam = "_yyrefresh";
 const keys = new Map([
   ["ArrowUp", 38], ["ArrowDown", 40], ["ArrowLeft", 37], ["ArrowRight", 39],
   ["KeyW", 38], ["KeyS", 40], ["KeyA", 37], ["KeyD", 39],
-  ["Enter", 13], ["Space", 13], ["KeyZ", 13], ["KeyJ", 74], ["Escape", 27], ["KeyX", 27],
+  ["Enter", 13], ["Space", 13], ["KeyZ", 13], ["KeyJ", 74], ["KeyM", 77], ["Escape", 27], ["KeyX", 27],
 ]);
 let wasm;
+let previousTrafficFrame = 0;
+
+function animateTraffic(now) {
+  const elapsed = Math.floor(now - previousTrafficFrame);
+  if (elapsed >= 65) {
+    previousTrafficFrame = now;
+    wasm.animate_traffic(elapsed);
+  }
+  requestAnimationFrame(animateTraffic);
+}
 
 const screen = {
   bitmap(address) {
@@ -99,6 +110,7 @@ function sendKey(key) {
   if (!wasm || refreshButton.disabled) return;
   wasm.key(key);
   refreshButton.hidden = !wasm.is_title();
+  mapButton.hidden = !wasm.has_map_control();
   if (refreshButton.hidden) status.hidden = true;
 }
 
@@ -108,8 +120,11 @@ try {
   const { instance } = await WebAssembly.instantiate(await response.arrayBuffer(), { screen });
   wasm = instance.exports;
   wasm.draw();
+  mapButton.hidden = !wasm.has_map_control();
   status.hidden = true;
   controls.hidden = false;
+  previousTrafficFrame = performance.now();
+  requestAnimationFrame(animateTraffic);
 } catch (error) {
   showStatus("ゲームを読み込めませんでした。「キャッシュを消して再読み込み」をお試しください。");
   console.error(error);
