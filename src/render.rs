@@ -27,6 +27,13 @@ const MIST: u32 = 0xcab9ce;
 const MINT: u32 = 0x95d5b4;
 const RED: u32 = 0xf48b78;
 
+const TITLE: &[u8; BUFFER_WIDTH * BUFFER_HEIGHT * 3] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/title.rgb"));
+const _: () = {
+    assert!(art_sizes::TITLE_WIDTH == BUFFER_WIDTH);
+    assert!(art_sizes::TITLE_HEIGHT == BUFFER_HEIGHT);
+};
+
 const ALLEN: Sprite = Sprite::new(
     include_bytes!(concat!(env!("OUT_DIR"), "/allen.rgba")),
     art_sizes::PORTRAIT,
@@ -54,6 +61,7 @@ pub struct Label {
     pub size: i32,
     pub color: u32,
     pub text: String,
+    pub serif: bool,
 }
 
 pub struct Frame {
@@ -87,6 +95,7 @@ impl Frame {
             size,
             color,
             text: text.into(),
+            serif: false,
         });
     }
 
@@ -162,17 +171,31 @@ impl Frame {
     }
 
     fn title(&mut self) {
-        self.landscape(0, 0, 320, 155);
-        self.rect(0, 155, 320, 2, LINE);
-        self.art(ALLEN, 201, 91, 66);
-        self.art(LILITH, 249, 100, 56);
-        self.label(22, 30, 10, MINT, "環状列島ヴェルデリア");
-        self.label(21, 51, 23, IVORY, "残響のアルカディア");
-        self.label(23, 91, 12, MIST, "序章　辺境の残響");
-        self.panel(19, 171, 282, 48);
-        self.label(33, 179, 14, GOLD, "▶　旅をはじめる");
-        self.label(35, 202, 9, MIST, "Enter / Z で決定");
-        self.label(195, 202, 9, MINT, "M  ワールドマップ");
+        for (dest, [red, green, blue]) in self.pixels.iter_mut().zip(TITLE.as_chunks::<3>().0) {
+            *dest = u32::from_be_bytes([0, *red, *green, *blue]);
+        }
+        let bronze = 0x9e805b;
+        self.rect(8, 8, 304, 1, bronze);
+        self.rect(8, 231, 304, 1, bronze);
+        for x in [8, 311] {
+            self.rect(x, 8, 1, 13, bronze);
+            self.rect(x, 219, 1, 13, bronze);
+        }
+        for row in 0_i32..7 {
+            let half = 3 - (row - 3).abs();
+            self.rect(24 - half, 26 + row, half * 2 + 1, 1, 0xd7b681);
+        }
+        self.label(34, 24, 9, 0xdeccaa, "環状列島ヴェルデリア");
+        self.label(19, 45, 29, 0xf1ddaf, "残響の");
+        self.labels.last_mut().unwrap().serif = true;
+        self.label(17, 76, 23, 0xffebc4, "アルカディア");
+        self.labels.last_mut().unwrap().serif = true;
+        self.rect(21, 112, 143, 1, bronze);
+        self.rect(21, 111, 26, 3, 0xc09a6a);
+        self.label(22, 123, 11, 0xe4cda4, "序章　辺境の残響");
+        self.label(21, 149, 13, 0xffdc9e, "▶　旅をはじめる");
+        self.label(23, 173, 9, 0xe2d6c2, "Enter / Z で決定");
+        self.label(23, 188, 9, 0xe2d6c2, "M  ワールドマップ");
     }
 
     fn field(&mut self, game: &Game) {

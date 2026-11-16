@@ -18,7 +18,7 @@ mod web {
     #[link(wasm_import_module = "screen")]
     extern "C" {
         fn bitmap(pixels: *const u32, width: usize, height: usize);
-        fn text(x: i32, y: i32, size: i32, color: u32, utf8: *const u8, len: usize);
+        fn text(x: i32, y: i32, size: i32, color: u32, utf8: *const u8, len: usize, serif: bool);
     }
 
     thread_local! {
@@ -41,6 +41,7 @@ mod web {
                         label.color,
                         label.text.as_ptr(),
                         label.text.len(),
+                        label.serif,
                     );
                 }
             }

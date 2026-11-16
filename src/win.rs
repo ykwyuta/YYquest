@@ -213,8 +213,12 @@ unsafe fn paint_frame(dc: HDC, client: RECT, frame: &Frame) {
         SRCCOPY,
     );
     SetBkMode(buffer, TRANSPARENT as i32);
-    let font_name = windows_sys::w!("Yu Gothic UI");
     for label in &frame.labels {
+        let font_name = if label.serif {
+            windows_sys::w!("Yu Mincho")
+        } else {
+            windows_sys::w!("Yu Gothic UI")
+        };
         let font = CreateFontW(
             -(f64::from(label.size) * scale).round() as i32,
             0,

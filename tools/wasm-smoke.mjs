@@ -28,6 +28,11 @@ function press(...keys) {
 function has(fragment) {
   assert.ok(labels.some((text) => text.includes(fragment)), labels.join(" / "));
 }
+function hasTitle() {
+  assert.equal(wasm.is_title(), 1);
+  has("残響の");
+  has("アルカディア");
+}
 function hasDialogue(line) {
   has(line);
   assert.ok(!labels.some((text) => text.includes("WASD") || text.includes("東の森へ。") || text.includes("リリスと北の石碑へ。")),
@@ -38,7 +43,7 @@ const enter = 13, left = 37, up = 38, right = 39, down = 40, journal = 74;
 wasm.draw();
 assert.equal(wasm.animate_traffic(70), 0);
 assert.equal(wasm.is_title(), 1);
-has("残響のアルカディア");
+hasTitle();
 assert.notEqual(center, 0);
 
 const map = 77, escape = 27;
@@ -75,7 +80,7 @@ press(enter);
 has("虚無の海");
 press(escape);
 assert.equal(wasm.is_title(), 1);
-has("残響のアルカディア");
+hasTitle();
 press(enter);
 assert.equal(wasm.is_title(), 0);
 hasDialogue("新聖律歴30年");
@@ -111,7 +116,7 @@ has("序章　完");
 has("残った記憶  2/3");
 press(enter, left);
 assert.equal(wasm.is_title(), 1);
-has("残響のアルカディア");
+hasTitle();
 // Open the debug menu via the directional pad, then jump to a town and a story.
 press(up, up, down, down, left, right, left, right);
 assert.equal(wasm.is_title(), 1);
