@@ -28,7 +28,11 @@
           <button id="sound-toggle" type="button" aria-pressed="true" hidden>効果音</button>
           <button type="button" class="journal" data-key="74">手記</button>
           <button type="button" class="confirm" data-key="13">決定</button>
-          <button id="touch-layout" type="button" aria-controls="controls" hidden>操作を画面の外へ</button>
+          <select id="touch-layout" aria-label="方向操作の表示" aria-controls="controls">
+            <option value="outside">操作を画面の外へ</option>
+            <option value="overlay">操作を画面に戻す</option>
+            <option value="zones">十字ボタン非表示</option>
+          </select>
         </div>
       </div>
     </div>
