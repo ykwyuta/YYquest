@@ -4,6 +4,12 @@ mod nox;
 mod tests;
 
 use crate::{
+    campaign::ChapterBeat,
+    dialogue::{Expression, Portrait, Speaker},
+    economy::Service,
+    walk::Walk,
+};
+use crate::{
     game::{Facing, Key},
     island::Position,
 };
@@ -119,6 +125,7 @@ pub(crate) enum Panel {
     Talk {
         title: &'static str,
         text: &'static str,
+        face: Option<Portrait>,
         next: Followup,
     },
 }
@@ -127,23 +134,28 @@ pub(crate) enum Panel {
 pub(crate) enum Followup {
     Close,
     Beat(usize),
+    Main,
     Choose(usize, usize),
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(crate) enum Travel {
     Stay,
+    AdvanceMain,
     Island,
     Sea,
+    Service(Service),
 }
 
 #[derive(Clone, Copy)]
 pub(crate) enum Action {
     Story(usize),
+    Main,
     Look,
     Profile,
     WaitForTide,
     Sail,
+    Service(Service),
 }
 
 pub(crate) struct Town {
@@ -154,6 +166,9 @@ pub(crate) struct Town {
     pub(crate) panel: Panel,
     pub(crate) tracked: usize,
     pub(crate) low_tide: bool,
+    pub(crate) main: Option<&'static ChapterBeat>,
+    pub(crate) walk: Walk,
+    track_side: bool,
 }
 
 impl Town {
@@ -174,6 +189,9 @@ impl Town {
             panel: Panel::Explore,
             tracked,
             low_tide: false,
+            main: None,
+            walk: Walk::default(),
+            track_side: false,
         }
     }
 
@@ -181,8 +199,25 @@ impl Town {
         plan(self.index)
     }
 
-    pub(crate) fn guide_destination(&self, states: &[State; 5]) -> Option<&'static Place> {
+    pub(crate) fn main_here(&self) -> Option<&'static ChapterBeat> {
+        self.main
+            .filter(|beat| beat.site == self.index && beat.place.is_some())
+    }
+
+    pub(crate) fn guide_destination(
+        &self,
+        states: &[State; 5],
+    ) -> Option<(Position, &'static str)> {
         let plan = self.plan();
+        if !self.track_side && self.main.is_some() {
+            let place = self
+                .main_here()
+                .and_then(|beat| beat.place)
+                .map(|index| &plan.places[index]);
+            return Some(place.map_or((plan.entry, "島街道への出口"), |place| {
+                (place.at, place.name)
+            }));
+        }
         let selected = plan.stories[self.tracked].objective(states[self.tracked]);
         let next = || {
             let index = states
@@ -191,7 +226,10 @@ impl Town {
                 .or_else(|| states.iter().position(|state| *state == State::New))?;
             plan.stories[index].objective(states[index])
         };
-        selected.or_else(next).map(|place| &plan.places[place])
+        selected.or_else(next).map(|index| {
+            let place = &plan.places[index];
+            (place.at, place.name)
+        })
     }
 
     pub(crate) fn nearby(&self) -> Option<usize> {
@@ -231,10 +269,14 @@ impl Town {
         place: usize,
         states: &[State; 5],
     ) -> impl Iterator<Item = Action> {
-        self.local_stories(place, states)
-            .map(Action::Story)
+        self.main_here()
+            .filter(|beat| beat.place == Some(place))
+            .map(|_| Action::Main)
+            .into_iter()
+            .chain(self.local_stories(place, states).map(Action::Story))
             .chain(std::iter::once(Action::Look))
             .chain((place == 0).then_some(Action::Profile))
+            .chain(Service::at(self.index, place).map(Action::Service))
             .chain((self.index == 1 && (place == 1 || place == 2)).then_some(Action::WaitForTide))
             .chain((self.index == 1 && place == 7).then_some(Action::Sail))
     }
@@ -244,6 +286,7 @@ impl Town {
         let next = (self.pos.0 + dx, self.pos.1 + dy);
         if self.landscape.walkable(next) {
             self.pos = next;
+            self.walk.step();
         }
     }
 
@@ -257,7 +300,10 @@ impl Town {
         }
         match self.panel {
             Panel::Explore => match key {
-                Key::Journal => self.panel = Panel::Journal,
+                Key::Journal => {
+                    self.track_side = false;
+                    self.panel = Panel::Journal;
+                }
                 Key::Confirm if self.at_exit() => return Travel::Island,
                 Key::Confirm => {
                     if let Some(place) = self.nearby() {
@@ -271,8 +317,14 @@ impl Town {
                 }
             },
             Panel::Journal => match key {
-                Key::Up | Key::Left => self.tracked = (self.tracked + 4) % 5,
-                Key::Down | Key::Right => self.tracked = (self.tracked + 1) % 5,
+                Key::Up | Key::Left => {
+                    self.tracked = (self.tracked + 4) % 5;
+                    self.track_side = true;
+                }
+                Key::Down | Key::Right => {
+                    self.tracked = (self.tracked + 1) % 5;
+                    self.track_side = true;
+                }
                 Key::Confirm | Key::Journal => self.panel = Panel::Explore,
                 _ => {}
             },
@@ -290,7 +342,16 @@ impl Town {
                     let Some(action) = self.local_actions(place, states).nth(row) else {
                         return Travel::Stay;
                     };
-                    if let Action::Story(index) = action {
+                    if matches!(action, Action::Main) {
+                        let beat = self.main_here().unwrap();
+                        self.panel = Panel::Talk {
+                            title: beat.title,
+                            text: beat.text,
+                            face: Some(beat.face),
+                            next: Followup::Main,
+                        };
+                    } else if let Action::Story(index) = action {
+                        self.track_side = true;
                         let beat = match states[index] {
                             State::New => 0,
                             State::Active(beat) => beat,
@@ -301,6 +362,7 @@ impl Town {
                         let site = &self.plan().places[place];
                         let (title, text) = match action {
                             Action::Sail => return Travel::Sea,
+                            Action::Service(service) => return Travel::Service(service),
                             Action::Profile => (self.plan().name, self.plan().profile),
                             Action::Look => (site.name, site.detail),
                             Action::WaitForTide => {
@@ -312,11 +374,12 @@ impl Town {
                                     ("満ち潮", "波が浜の細道を覆った。艇庫へは陸側の道を回ろう。")
                                 }
                             }
-                            Action::Story(_) => unreachable!(),
+                            Action::Story(_) | Action::Main => unreachable!(),
                         };
                         self.panel = Panel::Talk {
                             title,
                             text,
+                            face: None,
                             next: Followup::Close,
                         };
                     }
@@ -324,11 +387,17 @@ impl Town {
                 Key::Journal => self.panel = Panel::Journal,
                 _ => {}
             },
-            Panel::Talk { title, text, next } => match (next, key) {
+            Panel::Talk {
+                title,
+                text,
+                face,
+                next,
+            } => match (next, key) {
                 (Followup::Choose(index, pick), Key::Up | Key::Down | Key::Left | Key::Right) => {
                     self.panel = Panel::Talk {
                         title,
                         text,
+                        face,
                         next: Followup::Choose(index, 1 - pick),
                     };
                 }
@@ -338,6 +407,16 @@ impl Town {
                     self.panel = Panel::Talk {
                         title,
                         text,
+                        face: face.map(|old| {
+                            Portrait::new(
+                                old.speaker,
+                                if pick == 0 {
+                                    Expression::Relieved
+                                } else {
+                                    Expression::Thoughtful
+                                },
+                            )
+                        }),
                         next: Followup::Close,
                     };
                 }
@@ -354,6 +433,11 @@ impl Town {
                         self.tracked = index;
                     }
                     self.panel = Panel::Explore;
+                }
+                (Followup::Main, Key::Confirm) => {
+                    self.panel = Panel::Explore;
+                    self.track_side = false;
+                    return Travel::AdvanceMain;
                 }
                 (Followup::Close, Key::Confirm) => self.panel = Panel::Explore,
                 _ => {}
@@ -382,8 +466,33 @@ impl Town {
         self.panel = Panel::Talk {
             title: story.title,
             text: story.beats[beat].text,
+            face: Some(self.story_face(story.beats[beat].place, index, beat, story.beats.len())),
             next,
         };
+    }
+
+    fn story_face(&self, place: usize, story: usize, beat: usize, beats: usize) -> Portrait {
+        const FACES: [Speaker; 4] = [
+            Speaker::Villager,
+            Speaker::Worker,
+            Speaker::Guard,
+            Speaker::Traveler,
+        ];
+        let speaker = FACES[(self.index + place) % FACES.len()];
+        let expression = if beat + 1 == beats {
+            Expression::Relieved
+        } else if beat != 0 {
+            Expression::Thoughtful
+        } else {
+            [
+                Expression::Speaking,
+                Expression::Neutral,
+                Expression::Worried,
+                Expression::Surprised,
+                Expression::Speaking,
+            ][story]
+        };
+        Portrait::new(speaker, expression)
     }
 
     fn complete(&mut self, states: &mut [State; 5], index: usize, result: usize) {

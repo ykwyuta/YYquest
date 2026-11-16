@@ -1,4 +1,6 @@
 use crate::{
+    campaign::{Campaign, ChapterBeat},
+    economy::Service,
     game::Key,
     island::{Island, Kind, Tile},
     town::{self, Town, Travel},
@@ -22,7 +24,7 @@ pub(crate) const MAP: [&[u8; 24]; 15] = [
     b"........................",
 ];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum Region {
     Celestia,
     Sylva,
@@ -94,6 +96,7 @@ pub(crate) struct WorldMap {
     pub(crate) island: Option<Island>,
     pub(crate) town: Option<Town>,
     pub(crate) town_progress: town::Progress,
+    pub(crate) campaign: Campaign,
 }
 
 impl WorldMap {
@@ -103,6 +106,7 @@ impl WorldMap {
             island: None,
             town: None,
             town_progress: Default::default(),
+            campaign: Campaign::default(),
         }
     }
 
@@ -123,7 +127,9 @@ impl WorldMap {
             if island.region == Region::Nox {
                 if let Tile::Settlement(index) = island.tile(island.x, island.y) {
                     if index < town::COUNT {
-                        self.town = Some(Town::new(index, &self.town_progress[index]));
+                        let mut town = Town::new(index, &self.town_progress[index]);
+                        town.main = self.campaign.beat();
+                        self.town = Some(town);
                         return;
                     }
                 }
@@ -143,6 +149,9 @@ impl WorldMap {
         if island.region != Region::Nox {
             return None;
         }
+        if let Some(beat) = self.campaign.beat() {
+            return Some(beat.site);
+        }
         self.town_progress
             .iter()
             .enumerate()
@@ -161,16 +170,58 @@ impl WorldMap {
             .map(|(index, _)| index)
     }
 
-    pub(crate) fn town_input(&mut self, key: Key) {
-        let Some(town) = &mut self.town else { return };
+    pub(crate) fn town_input(&mut self, key: Key) -> Option<Service> {
+        let town = self.town.as_mut()?;
         match town.input(key, &mut self.town_progress[town.index]) {
             Travel::Stay => {}
+            Travel::AdvanceMain => {
+                self.campaign.advance();
+                town.main = self.campaign.beat();
+            }
             Travel::Island => self.town = None,
             Travel::Sea => {
                 self.town = None;
                 self.island = None;
             }
+            Travel::Service(service) => return Some(service),
         }
+        None
+    }
+
+    pub(crate) fn begin_nox(&mut self) {
+        self.campaign.start();
+        self.selected = Region::Nox;
+        self.island = Some(Island::new(Region::Nox));
+        self.town = None;
+        if let Some(island) = &mut self.island {
+            (island.x, island.y) = island.settlements()[0].door;
+        }
+        self.confirm();
+    }
+
+    pub(crate) fn chapter_at_ruin(&self) -> Option<&'static ChapterBeat> {
+        let step = self.campaign.beat()?;
+        let island = self.island.as_ref()?;
+        (island.region == Region::Nox
+            && step.place.is_none()
+            && (island.x, island.y) == island.settlements()[step.site].door)
+            .then_some(step)
+    }
+
+    pub(crate) fn chapter_input(&mut self, key: Key) -> bool {
+        if self.campaign.reading {
+            match key {
+                Key::Confirm => self.campaign.advance(),
+                Key::Map | Key::Back => self.campaign.reading = false,
+                _ => {}
+            }
+            return true;
+        }
+        if key == Key::Confirm && self.chapter_at_ruin().is_some() {
+            self.campaign.reading = true;
+            return true;
+        }
+        false
     }
 
     pub(crate) fn close_island(&mut self) -> bool {

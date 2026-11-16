@@ -381,12 +381,9 @@ fn prologue_ground(x: i32, y: i32) -> Ground {
 }
 
 impl Frame {
-    pub(super) fn draw_prologue_landscape(&mut self, view: super::view::View, lilith_joined: bool) {
-        use super::{
-            lilith,
-            view::{ROWS, TILE_SIZE},
-        };
-        use crate::game::{Facing, MAP};
+    pub(super) fn draw_prologue_landscape(&mut self, view: super::view::View) {
+        use super::view::{ROWS, TILE_SIZE};
+        use crate::game::MAP;
 
         self.rect(
             view.left - 1,
@@ -420,7 +417,7 @@ impl Frame {
                     }
                     b'H' => (COTTAGE, 40),
                     b'R' => (MEMORIAL, 39),
-                    b'L' if !lilith_joined => (lilith(Facing::South), 28),
+                    b'S' => (town_sprite(crate::town::Art::Sluice as usize), 36),
                     _ => continue,
                 };
                 let (px, py) = view.feet((x, y));

@@ -1,10 +1,15 @@
 mod art_sizes;
+mod campaign;
 mod debug;
+mod dialogue;
+mod economy;
 pub mod game;
+mod intro;
 mod island;
 mod noise;
 pub mod render;
 mod town;
+mod walk;
 mod world_map;
 
 #[cfg(target_arch = "wasm32")]
@@ -68,7 +73,25 @@ mod web {
     extern "C" fn has_map_control() -> bool {
         SESSION.with(|session| {
             let session = session.borrow();
-            session.0.map_open || session.0.can_open_map() || session.0.debug_back_control()
+            session.0.economy_menu.is_some()
+                || session.0.map_open
+                || session.0.can_open_map()
+                || session.0.debug_back_control()
+        })
+    }
+
+    #[no_mangle]
+    extern "C" fn reading_dialogue() -> bool {
+        SESSION.with(|session| {
+            let session = session.borrow();
+            let game = &session.0;
+            if game.map_open {
+                game.world_map.campaign.reading || game.world_map.town.as_ref().is_some_and(|town| {
+                    matches!(town.panel, crate::town::Panel::Talk { next, .. } if !matches!(next, crate::town::Followup::Choose(..)))
+                })
+            } else {
+                game.message.is_some() || game.battle.as_ref().is_some_and(|battle| battle.log.is_some())
+            }
         })
     }
 
@@ -83,7 +106,10 @@ mod web {
 
     #[no_mangle]
     extern "C" fn debug_back_control() -> bool {
-        SESSION.with(|session| session.borrow().0.debug_back_control())
+        SESSION.with(|session| {
+            let session = session.borrow();
+            session.0.economy_menu.is_some() || session.0.debug_back_control()
+        })
     }
 
     #[no_mangle]

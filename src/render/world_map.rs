@@ -13,6 +13,27 @@ impl Frame {
         }
         if let Some(island) = &world.island {
             self.draw_island(island, world.guide_site(island));
+            if let Some(beat) = world.chapter_at_ruin() {
+                if world.campaign.reading {
+                    let width = (self.width as i32 - 20).min(344);
+                    let x = (self.width as i32 - width) / 2;
+                    self.panel(x, 38, width, 145);
+                    self.label(x + 11, 47, 12, GOLD, beat.title);
+                    self.dialogue_content((x + 11, 65), width - 22, &[beat.text], Some(beat.face));
+                }
+                self.rect(122, 222, 96, 13, super::PANEL);
+                self.label(
+                    126,
+                    224,
+                    9,
+                    MINT,
+                    if world.campaign.reading {
+                        "決定　続ける"
+                    } else {
+                        "決定　本編を調べる"
+                    },
+                );
+            }
             return;
         }
         self.label(16, 6, 12, GOLD, "環状列島ヴェルデリア");

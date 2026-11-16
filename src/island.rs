@@ -3,7 +3,7 @@ mod maps;
 mod terrain;
 pub(crate) mod traffic;
 
-use crate::{game::Facing, world_map::Region};
+use crate::{game::Facing, walk::Walk, world_map::Region};
 
 const PLAN_WIDTH: usize = 26;
 const PLAN_HEIGHT: usize = 18;
@@ -125,6 +125,7 @@ pub(crate) struct Island {
     pub(crate) x: i32,
     pub(crate) y: i32,
     pub(crate) facing: Facing,
+    pub(crate) walk: Walk,
     layout: &'static Layout,
     tiles: Vec<Tile>,
     settlements: [Settlement; SETTLEMENTS],
@@ -164,6 +165,7 @@ impl Island {
             x,
             y,
             facing: Facing::South,
+            walk: Walk::default(),
             layout,
             tiles,
             settlements,
@@ -206,7 +208,7 @@ impl Island {
         let fauna = self
             .fauna
             .advance(&self.tiles, (self.x, self.y), milliseconds);
-        traffic || fauna
+        self.walk.advance(milliseconds) | traffic | fauna
     }
 
     pub(crate) fn return_to_harbor(&mut self) {
@@ -218,6 +220,7 @@ impl Island {
         let (x, y) = (self.x + dx, self.y + dy);
         if self.tile(x, y).walkable() {
             (self.x, self.y) = (x, y);
+            self.walk.step();
         }
     }
 }
