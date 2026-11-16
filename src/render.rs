@@ -1,4 +1,9 @@
-use crate::game::{Enemy, Game, Scene, COMMANDS, MAP, MAX_HP, MEMORIES};
+use crate::game::{Enemy, Game, Scene, COMMANDS, MAX_HP, MEMORIES};
+
+mod island;
+mod map_art;
+mod traffic;
+mod world_map;
 
 pub const WIDTH: usize = 320;
 pub const HEIGHT: usize = 240;
@@ -68,13 +73,33 @@ impl Frame {
     }
 
     fn art(&mut self, pixels: &[u8], x: i32, y: i32, size: usize) {
-        for row in 0..size {
-            for col in 0..size {
-                let index = (row * ART_SIZE / size * ART_SIZE + col * ART_SIZE / size) * 4;
-                let [r, g, b, a] = pixels[index..index + 4].try_into().unwrap();
+        self.art_clipped(pixels, x, y, size, [0, 0, WIDTH as i32, HEIGHT as i32]);
+    }
+
+    fn art_clipped(&mut self, pixels: &[u8], x: i32, y: i32, size: usize, clip: [i32; 4]) {
+        self.art_oriented(pixels, x, y, size, clip, false);
+    }
+
+    fn art_oriented(
+        &mut self,
+        pixels: &[u8],
+        x: i32,
+        y: i32,
+        size: usize,
+        clip: [i32; 4],
+        flip: bool,
+    ) {
+        let [left, top, right, bottom] = clip;
+        for dy in y.max(top)..(y + size as i32).min(bottom) {
+            let row = (dy - y) as usize * ART_SIZE / size;
+            for dx in x.max(left)..(x + size as i32).min(right) {
+                let col = (dx - x) as usize * ART_SIZE / size;
+                let col = if flip { ART_SIZE - 1 - col } else { col };
+                let offset = (row * ART_SIZE + col) * 4;
+                let [r, g, b, a] = pixels[offset..offset + 4].try_into().unwrap();
                 if a >= 128 {
-                    let rgb = u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b);
-                    self.rect(x + col as i32, y + row as i32, 1, 1, rgb);
+                    self.pixels[dy as usize * WIDTH + dx as usize] =
+                        u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b);
                 }
             }
         }
@@ -83,6 +108,10 @@ impl Frame {
     pub fn draw(&mut self, game: &Game) {
         self.pixels.fill(NIGHT);
         self.labels.clear();
+        if game.map_open {
+            self.draw_world_map(&game.world_map);
+            return;
+        }
         match game.scene {
             Scene::Title => self.title(),
             Scene::Field => self.field(game),
@@ -117,6 +146,7 @@ impl Frame {
         self.panel(19, 171, 282, 48);
         self.label(33, 179, 14, GOLD, "▶　旅をはじめる");
         self.label(35, 202, 9, MIST, "Enter / Z で決定");
+        self.label(195, 202, 9, MINT, "M  ワールドマップ");
     }
 
     fn field(&mut self, game: &Game) {
@@ -128,21 +158,7 @@ impl Frame {
             IVORY,
             format!("アレン  HP {:02}/{}", game.hp, MAX_HP),
         );
-        for (y, row) in MAP.iter().enumerate() {
-            for (x, tile) in row.iter().enumerate() {
-                let tile = if *tile == b'L' && game.lilith {
-                    b'g'
-                } else {
-                    *tile
-                };
-                self.tile(
-                    tile,
-                    16 + x as i32 * 16,
-                    25 + y as i32 * 16,
-                    (x + y * 5) as i32,
-                );
-            }
-        }
+        self.draw_prologue_landscape(game.lilith);
         if let Some((x, y)) = game.companion_position {
             self.art(LILITH, 15 + x * 16, 23 + y * 16, 18);
         }
@@ -160,7 +176,13 @@ impl Frame {
                 "東の森へ。村のかまどで体力を回復できます。"
             };
             self.label(24, 196, 11, IVORY, objective);
-            self.label(24, 214, 9, MIST, "矢印 / WASD  移動     J  手記");
+            self.label(
+                24,
+                214,
+                9,
+                MIST,
+                "矢印 / WASD  移動     J  手記     M  地図",
+            );
         }
         if game.journal {
             self.labels.truncate(2);
@@ -178,61 +200,13 @@ impl Frame {
         }
     }
 
-    fn tile(&mut self, tile: u8, x: i32, y: i32, variant: i32) {
-        let shift = variant % 5;
-        match tile {
-            b'~' => {
-                self.rect(x, y, 16, 16, 0x283351);
-                self.rect(x + 2 + shift, y + 4, 7, 1, 0x465571);
-                self.rect(x + 6, y + 10 + shift, 6, 1, 0x394767);
-            }
-            b'#' => {
-                self.rect(x, y, 16, 16, 0x203c3b);
-                self.rect(x + 6, y + 10, 4, 6, 0x4a3b44);
-                self.rect(x + 2, y + 5, 12, 7, 0x315950);
-                self.rect(x + 4, y + 2, 8, 8, 0x3b6e5c);
-                self.rect(x + 6, y + 2, 3, 2, 0x619179);
-            }
-            b'.' => {
-                self.rect(x, y, 16, 16, 0x80645a);
-                self.rect(x + shift, y + 3, 3, 1, 0xa88770);
-                self.rect(x + 9, y + 11, 2 + shift / 3, 1, 0x674e50);
-            }
-            _ => {
-                self.rect(
-                    x,
-                    y,
-                    16,
-                    16,
-                    if variant % 3 == 0 { 0x4a6d53 } else { 0x4f765b },
-                );
-                self.rect(x + 2 + shift, y + 4, 3, 1, 0x789675);
-                self.rect(x + 10, y + 11, 2, 2, 0x3e624c);
-                match tile {
-                    b'H' => {
-                        self.rect(x + 3, y + 8, 11, 6, 0x8e7168);
-                        self.rect(x + 2, y + 5, 13, 4, 0xba765f);
-                        self.rect(x + 5, y + 3, 7, 2, 0xd89578);
-                        self.rect(x + 7, y + 10, 3, 4, GOLD);
-                    }
-                    b'R' => {
-                        self.rect(x + 4, y + 3, 8, 12, 0x697083);
-                        self.rect(x + 5, y + 2, 6, 2, 0xa29cae);
-                        self.rect(x + 7, y + 6, 2, 5, GOLD);
-                    }
-                    b'L' => self.art(LILITH, x - 1, y - 2, 18),
-                    _ => {}
-                }
-            }
-        }
-    }
-
     fn battle(&mut self, game: &Game) {
         let battle = game.battle.as_ref().expect("Battle scene has an enemy");
         let art = match battle.enemy {
             Enemy::Slime => SLIME,
             Enemy::Bat => BAT,
             Enemy::Echo => ECHO,
+            Enemy::Beast(beast) => map_art::fauna_sprite(beast.0),
         };
         self.landscape(0, 23, 320, 125);
         self.rect(114, 122, 92, 3, 0x283449);
@@ -318,6 +292,7 @@ impl Frame {
         self.label(29, 159, 11, IVORY, first);
         self.label(29, 176, 11, IVORY, second);
         if won {
+            self.label(180, 189, 10, MINT, "M  ワールドマップ");
             self.label(
                 29,
                 205,

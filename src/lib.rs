@@ -1,5 +1,8 @@
 pub mod game;
+mod island;
+mod noise;
 pub mod render;
+mod world_map;
 
 #[cfg(target_arch = "wasm32")]
 mod web {
@@ -43,7 +46,27 @@ mod web {
 
     #[no_mangle]
     extern "C" fn is_title() -> bool {
-        SESSION.with(|session| matches!(session.borrow().0.scene, crate::game::Scene::Title))
+        SESSION.with(|session| {
+            let session = session.borrow();
+            !session.0.map_open && matches!(session.0.scene, crate::game::Scene::Title)
+        })
+    }
+
+    #[no_mangle]
+    extern "C" fn has_map_control() -> bool {
+        SESSION.with(|session| {
+            let session = session.borrow();
+            session.0.map_open || session.0.can_open_map()
+        })
+    }
+
+    #[no_mangle]
+    extern "C" fn animate_traffic(milliseconds: u32) -> bool {
+        let redraw = SESSION.with(|session| session.borrow_mut().0.advance_traffic(milliseconds));
+        if redraw {
+            draw();
+        }
+        redraw
     }
 
     #[no_mangle]

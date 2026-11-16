@@ -18,6 +18,8 @@ use yyquest::{
 };
 
 const CLASS: windows_sys::core::PCWSTR = windows_sys::w!("YYquest");
+const TRAFFIC_TIMER: usize = 1;
+const TRAFFIC_INTERVAL: u32 = 70;
 
 thread_local! {
     static SESSION: RefCell<(Game, Frame)> = RefCell::new((Game::new(), Frame::new()));
@@ -56,6 +58,7 @@ pub fn run() {
             return;
         }
 
+        SetTimer(window, TRAFFIC_TIMER, TRAFFIC_INTERVAL, None);
         ShowWindow(window, SW_SHOW);
         let mut message: MSG = zeroed();
         while GetMessageW(&mut message, null_mut(), 0, 0) > 0 {
@@ -82,6 +85,14 @@ unsafe extern "system" fn window_proc(
                 return 0;
             }
         }
+        WM_TIMER if wparam == TRAFFIC_TIMER => {
+            if IsIconic(window) == 0
+                && SESSION.with(|session| session.borrow_mut().0.advance_traffic(TRAFFIC_INTERVAL))
+            {
+                InvalidateRect(window, null(), 0);
+            }
+            return 0;
+        }
         WM_PAINT => {
             let mut paint: PAINTSTRUCT = zeroed();
             let dc = BeginPaint(window, &mut paint);
@@ -98,6 +109,7 @@ unsafe extern "system" fn window_proc(
         }
         WM_ERASEBKGND => return 1,
         WM_DESTROY => {
+            KillTimer(window, TRAFFIC_TIMER);
             PostQuitMessage(0);
             return 0;
         }

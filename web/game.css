@@ -36,7 +36,8 @@ canvas {
 .left { grid-area: left; }
 .down { grid-area: down; }
 .right { grid-area: right; }
-.actions { display: flex; gap: 6px; }
+.actions { display: grid; grid-template-columns: repeat(2, auto); gap: 6px; }
+#map-control { grid-column: 1 / -1; }
 button {
   appearance: none;
   min-width: 44px;
