@@ -44,8 +44,9 @@ impl Gathering {
 
 impl Town {
     pub(crate) fn gathering_spots(&self) -> &'static [Spot] {
-        match self.index {
-            0 => &[
+        use crate::world_map::Region;
+        match (self.region, self.index) {
+            (Region::Nox, 0) => &[
                 Spot {
                     at: (219, 82),
                     item: Item::AshHerb,
@@ -57,12 +58,12 @@ impl Town {
                     quantity: 2,
                 },
             ],
-            1 => &[Spot {
+            (Region::Nox, 1) => &[Spot {
                 at: (80, 146),
                 item: Item::BitterRoot,
                 quantity: 2,
             }],
-            5 => &[Spot {
+            (Region::Nox, 5) => &[Spot {
                 at: (164, 154),
                 item: Item::BogIron,
                 quantity: 3,

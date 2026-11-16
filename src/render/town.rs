@@ -10,8 +10,7 @@ use crate::{
     economy::{Goods, Item},
     island::Position,
     noise,
-    town::{Action, Followup, Gathering, Panel, State, Surface, Town, HEIGHT, WIDTH},
-    world_map::Region,
+    town::{Action, Art, Followup, Gathering, Panel, State, Surface, Town, HEIGHT, WIDTH},
 };
 
 impl Frame {
@@ -47,7 +46,7 @@ impl Frame {
                 let v = noise::hash(at.0, at.1 + 53 * town.index as i32);
                 let (sprite, side) = match site {
                     Surface::Woods if v % 11 < 2 => (
-                        art::tree(Region::Nox, (v >> 16) as usize),
+                        art::tree(town.region, (v >> 16) as usize),
                         17 + (v % 15) as i32,
                     ),
                     Surface::Reeds if v % 5 < 2 => (art::REEDS, 11 + (v % 7) as i32),
@@ -100,7 +99,13 @@ impl Frame {
                     || town.local_stories(index, states).next().is_some();
                 if place.art.is_some() || has_story {
                     let worker = (index + town.index) % 4;
-                    frame.art_clipped(art::town_sprite(12 + worker), x + 2, y - 14, 36, view.clip);
+                    frame.art_clipped(
+                        art::town_sprite(town.region, 12 + worker),
+                        x + 2,
+                        y - 14,
+                        36,
+                        view.clip,
+                    );
                 }
                 let color =
                     if plan.stories[town.tracked].objective(states[town.tracked]) == Some(index) {
@@ -126,13 +131,18 @@ impl Frame {
                 let (x, y) = point(prop.at);
                 if prop.at.1 >= camera.1 - 2 {
                     let size = prop.size * ZOOM;
-                    let base = if matches!(prop.art, crate::town::Art::Bridge) {
+                    let base = if matches!(prop.art, Art::Bridge) {
                         26
                     } else {
                         9
                     };
+                    let sprite = if matches!(prop.art, Art::Landmark) {
+                        art::town_landmark(town.region, town.index)
+                    } else {
+                        art::town_sprite(town.region, prop.art as usize)
+                    };
                     self.art_clipped(
-                        art::town_sprite(prop.art as usize),
+                        sprite,
                         x + TILE_SIZE / 2 - size / 2,
                         y + base * ZOOM - size,
                         size as usize,
@@ -166,6 +176,7 @@ impl Frame {
             self.draw_guide(
                 Guidance {
                     area: Area::Town {
+                        region: town.region,
                         index: town.index,
                         low_tide: town.low_tide,
                         outcome: states[0],

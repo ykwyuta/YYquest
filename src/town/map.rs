@@ -1,5 +1,5 @@
 use super::{Art, Plan, State};
-use crate::{island, island::Position, noise};
+use crate::{island, island::Position, noise, world_map::Region};
 
 pub(crate) const WIDTH: i32 = island::WIDTH;
 pub(crate) const HEIGHT: i32 = island::HEIGHT;
@@ -16,6 +16,10 @@ pub(crate) enum Landscape {
     Fort,
     Valley,
     River,
+    Chalk,
+    Canopy,
+    Canal,
+    Basalt,
     Square,
     Yard,
     Wood,
@@ -67,9 +71,16 @@ pub(crate) struct TownMap {
 }
 
 impl TownMap {
-    pub(super) fn new(plan: &Plan, index: usize) -> Self {
+    pub(super) fn new(plan: &Plan, region: Region, index: usize) -> Self {
+        let seed = match region {
+            Region::Nox => index,
+            Region::Celestia => index + 17,
+            Region::Sylva => index + 37,
+            Region::Liberta => index + 57,
+            Region::Vulcan => index + 77,
+        };
         let surface = (0..HEIGHT)
-            .flat_map(|y| (0..WIDTH).map(move |x| base(plan.terrain, index, x, y)))
+            .flat_map(|y| (0..WIDTH).map(move |x| base(plan.terrain, seed, x, y)))
             .collect();
         let mut map = Self {
             surface,
@@ -80,15 +91,15 @@ impl TownMap {
 
         for (i, place) in plan.places.iter().enumerate() {
             let (x, y) = place.at;
-            let radius = match (index, i) {
-                (7 | 9, 0 | 1) => 10,
-                (_, 0..=3) => 6,
+            let radius = match (region, index, i) {
+                (Region::Nox, 7 | 9, 0 | 1) => 10,
+                (_, _, 0..=3) => 6,
                 _ => 4,
             };
             for dy in -radius..=radius {
                 for dx in -radius..=radius {
                     let edge = dx * dx + 2 * dy * dy;
-                    if edge < radius * radius + variation(index, x + dx, y + dy) % 9 {
+                    if edge < radius * radius + variation(seed, x + dx, y + dy) % 9 {
                         let tile = patch(place.ground, x + dx, y + dy);
                         map.paint((x + dx, y + dy), tile);
                     }
@@ -96,16 +107,20 @@ impl TownMap {
             }
         }
         let surface = match plan.terrain {
-            Landscape::Stone | Landscape::Fort | Landscape::River => Surface::Paving,
-            Landscape::Marsh => Surface::Deck,
+            Landscape::Stone | Landscape::Fort | Landscape::River | Landscape::Chalk | Landscape::Basalt => Surface::Paving,
+            Landscape::Marsh | Landscape::Canal => Surface::Deck,
             _ => Surface::Trail,
         };
-        let hub = match index {
-            1 | 2 | 4 | 7 => 1,
-            _ => 0,
+        let hub = if region == Region::Nox {
+            match index {
+                1 | 2 | 4 | 7 => 1,
+                _ => 0,
+            }
+        } else {
+            0
         };
         let center = plan.places[hub].at;
-        map.route(plan.entry, center, surface, 2, index % 2 == 0);
+        map.route(plan.entry, center, surface, 2, seed % 2 == 0);
         for (i, place) in plan.places.iter().enumerate() {
             if i == hub {
                 continue;
@@ -113,38 +128,42 @@ impl TownMap {
             // Connect outlying work areas to adjacent districts rather than
             // running a separate avenue from the center to every doorstep.
             let mut parent = center;
-            if index == 8 && matches!(i, 2 | 3 | 4 | 6 | 7) {
+            if region == Region::Nox && index == 8 && matches!(i, 2 | 3 | 4 | 6 | 7) {
                 parent = (center.0, 114);
             }
             for (j, site) in plan.places[..i].iter().enumerate() {
-                if index == 8 && (matches!(i, 1 | 5) != matches!(j, 1 | 5)) {
+                if region == Region::Nox && index == 8 && (matches!(i, 1 | 5) != matches!(j, 1 | 5)) {
                     continue;
                 }
                 if distance(place.at, site.at) < distance(place.at, parent) {
                     parent = site.at;
                 }
             }
-            map.route(parent, place.at, surface, 2, (i + index) % 2 == 0);
+            map.route(parent, place.at, surface, 2, (i + seed) % 2 == 0);
         }
 
-        let [a, b] = match index {
-            0 => [1, 7],
-            1 => [0, 7],
-            2 => [6, 7],
-            3 => [0, 5],
-            4 => [2, 4],
-            5 => [3, 6],
-            6 => [0, 3],
-            7 => [1, 3],
-            8 => [2, 7],
-            _ => [2, 6],
+        let [a, b] = if region == Region::Nox {
+            match index {
+                0 => [1, 7],
+                1 => [0, 7],
+                2 => [6, 7],
+                3 => [0, 5],
+                4 => [2, 4],
+                5 => [3, 6],
+                6 => [0, 3],
+                7 => [1, 3],
+                8 => [2, 7],
+                _ => [2, 6],
+            }
+        } else {
+            [(index + 1) % 4 + 1, 5 + (index % 3)]
         };
         map.route(
             plan.places[a].at,
             plan.places[b].at,
             Surface::Trail,
             1,
-            index % 2 != 0,
+            seed % 2 != 0,
         );
 
         for place in &plan.places {
@@ -167,9 +186,9 @@ impl TownMap {
                 );
             }
         }
-        map.add_houses(plan, index);
-        map.add_houses_at_entrance(plan.entry, index);
-        if index == 1 {
+        map.add_houses(plan, region, seed, index);
+        map.add_houses_at_entrance(plan.entry, seed);
+        if region == Region::Nox && index == 1 {
             let west = (83..=105).flat_map(|x| [154, 155].map(move |y| (x, y)));
             let east = (105..=143).flat_map(|x| [155, 156].map(move |y| (x, y)));
             let ramps = (141..=155).flat_map(|y| [83, 143].map(move |x| (x, y)));
@@ -200,7 +219,10 @@ impl TownMap {
         }
     }
 
-    pub(super) fn apply_outcome(&mut self, index: usize, state: State) {
+    pub(super) fn apply_outcome(&mut self, region: Region, index: usize, state: State) {
+        if region != Region::Nox {
+            return;
+        }
         match (index, state) {
             (2, State::Done(0)) => self.route((64, 102), (77, 59), Surface::Trail, 1, false),
             (3, State::Done(_)) => {
@@ -271,7 +293,7 @@ impl TownMap {
         self.props.push(prop);
     }
 
-    fn add_houses(&mut self, plan: &Plan, index: usize) {
+    fn add_houses(&mut self, plan: &Plan, region: Region, seed: usize, index: usize) {
         const LOTS: [(i32, i32); 16] = [
             (-7, 3),
             (8, 5),
@@ -299,7 +321,7 @@ impl TownMap {
         for (i, place) in plan.places[..4].iter().enumerate() {
             for &(dx, dy) in &LOTS[..depth - i] {
                 let (x, y) = (place.at.0 + dx, place.at.1 + dy);
-                let v = variation(index, x, y);
+                let v = variation(seed, x, y);
                 let spaced = self.props.iter().all(|prop| distance((x, y), prop.at) >= 5);
                 let on_land = (-2..=1).all(|dy| {
                     (-1..=1).all(|dx| {
@@ -316,7 +338,9 @@ impl TownMap {
                 {
                     continue;
                 }
-                let art = if matches!(index, 2 | 9) && v % 4 == 0 {
+                let art = if (region == Region::Nox && matches!(index, 2 | 9) && v % 4 == 0)
+                    || (region != Region::Nox && v % 7 == 0)
+                {
                     Art::Stalls
                 } else {
                     Art::Cottage
@@ -324,7 +348,7 @@ impl TownMap {
                 let size = 31 + v % 15;
                 if matches!(
                     plan.terrain,
-                    Landscape::Fort | Landscape::Stone | Landscape::River
+                    Landscape::Fort | Landscape::Stone | Landscape::River | Landscape::Chalk | Landscape::Basalt
                 ) {
                     self.route((x, y + 1), (x, y + 3), Surface::Paving, 1, false);
                 } else {
@@ -406,6 +430,13 @@ fn base(landscape: Landscape, index: usize, x: i32, y: i32) -> Surface {
                 Surface::Wheat
             }
         }
+        Landscape::Chalk if distance < 130 || n > 185 => Surface::Gravel,
+        Landscape::Chalk if n > 140 => Surface::Heath,
+        Landscape::Canopy if n > 95 && broad < 160 => Surface::Woods,
+        Landscape::Canal if (x - wet_x).abs() <= 4 || (y - river_y).abs() <= 4 => Surface::Water,
+        Landscape::Canal if distance < 120 => Surface::Gravel,
+        Landscape::Basalt if ((y < 52 || x > 245) && n > 165) || n > 224 => Surface::Rock,
+        Landscape::Basalt if distance < 135 || n > 120 => Surface::Heath,
         Landscape::Stone if distance < 137 || n > 191 => Surface::Gravel,
         Landscape::Fort if distance < 119 && n > 92 => Surface::Gravel,
         Landscape::River if distance < 114 && n > 114 => Surface::Gravel,
@@ -427,8 +458,10 @@ fn patch(landscape: Landscape, x: i32, y: i32) -> Surface {
         Landscape::Shore => Surface::Sand,
         Landscape::Dock => Surface::Deck,
         Landscape::Farm if (x + y / 8).rem_euclid(5) < 4 => Surface::Wheat,
-        Landscape::Heath => Surface::Heath,
-        Landscape::Stone => Surface::Gravel,
+        Landscape::Heath | Landscape::Basalt => Surface::Heath,
+        Landscape::Stone | Landscape::Chalk => Surface::Gravel,
+        Landscape::Canopy => Surface::Woods,
+        Landscape::Canal => Surface::Deck,
         _ => Surface::Grass,
     }
 }

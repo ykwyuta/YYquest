@@ -1,6 +1,32 @@
 use super::{Frame, Sprite, DISPLAY_SCALE};
 use crate::art_sizes;
 use crate::noise::sample as natural_noise;
+use std::sync::OnceLock;
+
+fn decode_lz(src: &[u8]) -> Vec<u8> {
+    let total = u32::from_le_bytes(src[..4].try_into().unwrap()) as usize;
+    let mut dst = Vec::with_capacity(total);
+    let mut i = 4usize;
+    while i < src.len() {
+        let tag = src[i];
+        i += 1;
+        if tag < 0x80 {
+            let len = usize::from(tag) + 1;
+            dst.extend_from_slice(&src[i..i + len]);
+            i += len;
+        } else {
+            let len = usize::from(tag & 0x7f) + 3;
+            let off = usize::from(u16::from_le_bytes([src[i], src[i + 1]]));
+            i += 2;
+            let start = dst.len() - off;
+            for k in 0..len {
+                let b = dst[start + k];
+                dst.push(b);
+            }
+        }
+    }
+    dst
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(usize)]
@@ -83,11 +109,43 @@ sprite_assets! {
     CARRIAGE_NORTH => "carriage-north",
 }
 
-pub(super) fn town_sprite(index: usize) -> Sprite {
+pub(super) fn town_sprite(region: crate::world_map::Region, index: usize) -> Sprite {
+    use crate::world_map::Region;
+
     const SIZE: usize = art_sizes::MAP_OBJECT;
     const STRIDE: usize = SIZE * SIZE * 4;
-    const ATLAS: &[u8; 16 * STRIDE] = include_bytes!(concat!(env!("OUT_DIR"), "/nox-town.rgba"));
-    Sprite::new(&ATLAS[index * STRIDE..(index + 1) * STRIDE], SIZE)
+    static NOX: OnceLock<Vec<u8>> = OnceLock::new();
+    static CELESTIA: OnceLock<Vec<u8>> = OnceLock::new();
+    static SYLVA: OnceLock<Vec<u8>> = OnceLock::new();
+    static LIBERTA: OnceLock<Vec<u8>> = OnceLock::new();
+    static VULCAN: OnceLock<Vec<u8>> = OnceLock::new();
+    let atlas: &'static [u8] = match region {
+        Region::Nox => NOX.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/town-nox.rgba.lz")))),
+        Region::Celestia => CELESTIA.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/town-celestia.rgba.lz")))),
+        Region::Sylva => SYLVA.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/town-sylva.rgba.lz")))),
+        Region::Liberta => LIBERTA.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/town-liberta.rgba.lz")))),
+        Region::Vulcan => VULCAN.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/town-vulcan.rgba.lz")))),
+    };
+    Sprite::new(&atlas[index * STRIDE..(index + 1) * STRIDE], SIZE)
+}
+
+pub(super) fn town_landmark(region: crate::world_map::Region, index: usize) -> Sprite {
+    use crate::world_map::Region;
+
+    const SIZE: usize = art_sizes::MAP_OBJECT;
+    const STRIDE: usize = SIZE * SIZE * 4;
+    static CELESTIA: OnceLock<Vec<u8>> = OnceLock::new();
+    static SYLVA: OnceLock<Vec<u8>> = OnceLock::new();
+    static LIBERTA: OnceLock<Vec<u8>> = OnceLock::new();
+    static VULCAN: OnceLock<Vec<u8>> = OnceLock::new();
+    let atlas: &'static [u8] = match region {
+        Region::Nox => return town_sprite(Region::Nox, 0),
+        Region::Celestia => CELESTIA.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/town-landmarks-celestia.rgba.lz")))),
+        Region::Sylva => SYLVA.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/town-landmarks-sylva.rgba.lz")))),
+        Region::Liberta => LIBERTA.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/town-landmarks-liberta.rgba.lz")))),
+        Region::Vulcan => VULCAN.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/town-landmarks-vulcan.rgba.lz")))),
+    };
+    Sprite::new(&atlas[index * STRIDE..(index + 1) * STRIDE], SIZE)
 }
 
 pub(super) fn fauna_sprite(species: crate::island::fauna::Species) -> Sprite {
@@ -115,15 +173,20 @@ pub(super) fn fauna_sprite(species: crate::island::fauna::Species) -> Sprite {
 }
 
 pub(super) fn settlement(region: crate::world_map::Region, index: usize) -> Sprite {
-    use crate::{island::SETTLEMENTS, world_map::Region};
+    use crate::world_map::Region;
 
     const STRIDE: usize = art_sizes::SETTLEMENT * art_sizes::SETTLEMENT * 4;
-    let atlas: &[u8; SETTLEMENTS * STRIDE] = match region {
-        Region::Nox => include_bytes!(concat!(env!("OUT_DIR"), "/settlements-nox.rgba")),
-        Region::Celestia => include_bytes!(concat!(env!("OUT_DIR"), "/settlements-celestia.rgba")),
-        Region::Sylva => include_bytes!(concat!(env!("OUT_DIR"), "/settlements-sylva.rgba")),
-        Region::Liberta => include_bytes!(concat!(env!("OUT_DIR"), "/settlements-liberta.rgba")),
-        Region::Vulcan => include_bytes!(concat!(env!("OUT_DIR"), "/settlements-vulcan.rgba")),
+    static NOX: OnceLock<Vec<u8>> = OnceLock::new();
+    static CELESTIA: OnceLock<Vec<u8>> = OnceLock::new();
+    static SYLVA: OnceLock<Vec<u8>> = OnceLock::new();
+    static LIBERTA: OnceLock<Vec<u8>> = OnceLock::new();
+    static VULCAN: OnceLock<Vec<u8>> = OnceLock::new();
+    let atlas: &'static [u8] = match region {
+        Region::Nox => NOX.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/settlements-nox.rgba.lz")))),
+        Region::Celestia => CELESTIA.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/settlements-celestia.rgba.lz")))),
+        Region::Sylva => SYLVA.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/settlements-sylva.rgba.lz")))),
+        Region::Liberta => LIBERTA.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/settlements-liberta.rgba.lz")))),
+        Region::Vulcan => VULCAN.get_or_init(|| decode_lz(include_bytes!(concat!(env!("OUT_DIR"), "/settlements-vulcan.rgba.lz")))),
     };
     Sprite::new(
         &atlas[index * STRIDE..(index + 1) * STRIDE],
@@ -175,6 +238,42 @@ mod tests {
             }
         }
         assert_eq!(sprites.len(), 65);
+    }
+
+    #[test]
+    fn all_town_atlases_and_landmarks_are_unique_and_visible() {
+        let mut regional = HashSet::new();
+        for region in Region::ALL {
+            for index in 0..16 {
+                let sprite = super::town_sprite(region, index).pixels;
+                assert!(regional.insert(sprite), "{region:?} town sprite {index}");
+                let visible = sprite
+                    .chunks_exact(4)
+                    .filter(|pixel| pixel[3] >= 128)
+                    .count();
+                assert!(visible > 200, "{region:?} town sprite {index}: {visible}");
+            }
+        }
+        assert_eq!(regional.len(), 80);
+
+        let mut landmarks = HashSet::new();
+        for region in [
+            Region::Celestia,
+            Region::Sylva,
+            Region::Liberta,
+            Region::Vulcan,
+        ] {
+            for index in 0..crate::town::COUNT {
+                let sprite = super::town_landmark(region, index).pixels;
+                assert!(landmarks.insert(sprite), "{region:?} landmark {index}");
+                let visible = sprite
+                    .chunks_exact(4)
+                    .filter(|pixel| pixel[3] >= 128)
+                    .count();
+                assert!(visible > 500, "{region:?} landmark {index}: {visible}");
+            }
+        }
+        assert_eq!(landmarks.len(), 40);
     }
 }
 
@@ -417,7 +516,13 @@ impl Frame {
                     }
                     b'H' => (COTTAGE, 40),
                     b'R' => (MEMORIAL, 39),
-                    b'S' => (town_sprite(crate::town::Art::Sluice as usize), 36),
+                    b'S' => (
+                        town_sprite(
+                            crate::world_map::Region::Nox,
+                            crate::town::Art::Sluice as usize,
+                        ),
+                        36,
+                    ),
                     _ => continue,
                 };
                 let (px, py) = view.feet((x, y));

@@ -17,6 +17,7 @@ pub(super) enum Area {
     Prologue,
     Island(Region),
     Town {
+        region: Region,
         index: usize,
         low_tide: bool,
         outcome: State,

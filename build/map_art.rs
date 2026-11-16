@@ -32,15 +32,28 @@ pub(super) fn build(out: &Path) {
     }
 
     build_settlements(out);
-    let nox_town = load(&format!("{ART_DIR}/nox-town.png"));
-    let mut sprites = Vec::new();
-    for index in 0..16 {
-        let tile = cell(&nox_town, 4, 4, index % 4, index / 4);
-        let name = format!("Nox town sprite {index}");
-        let tile = isolate_settlement(tile, &name);
-        sprites.extend(fit_sprite(&tile, &name, art_sizes::MAP_OBJECT).into_raw());
+    for region in ["nox", "celestia", "sylva", "liberta", "vulcan"] {
+        let atlas = load(&format!("{ART_DIR}/{region}-town.png"));
+        let mut sprites = Vec::new();
+        for index in 0..16 {
+            let tile = cell(&atlas, 4, 4, index % 4, index / 4);
+            let name = format!("{region} town sprite {index}");
+            let tile = isolate_settlement(tile, &name);
+            sprites.extend(fit_sprite(&tile, &name, art_sizes::MAP_OBJECT).into_raw());
+        }
+        write_lz(&out.join(format!("town-{region}.rgba.lz")), &sprites);
     }
-    fs::write(out.join("nox-town.rgba"), sprites).unwrap();
+    for region in ["celestia", "sylva", "liberta", "vulcan"] {
+        let mut sprites = Vec::new();
+        for index in 0..10 {
+            let path = format!("{ART_DIR}/towns/{region}-{index:02}.png");
+            let tile = load(&path);
+            let name = format!("{region} town landmark {index}");
+            let tile = isolate_settlement(tile, &name);
+            sprites.extend(fit_sprite(&tile, &name, art_sizes::MAP_OBJECT).into_raw());
+        }
+        write_lz(&out.join(format!("town-landmarks-{region}.rgba.lz")), &sprites);
+    }
     for name in ["forest", "mountain", "farm"] {
         export(
             &load(&format!("{ART_DIR}/{name}.png")),
@@ -198,8 +211,108 @@ fn build_settlements(out: &Path) {
             let clean = isolate_settlement(sprite, &name);
             sprites.extend(fit_sprite(&clean, &name, art_sizes::SETTLEMENT).into_raw());
         }
-        fs::write(out.join(format!("settlements-{region}.rgba")), sprites).unwrap();
+        write_lz(&out.join(format!("settlements-{region}.rgba.lz")), &sprites);
     }
+}
+
+fn write_lz(path: &Path, data: &[u8]) {
+    let mut out = Vec::with_capacity(4 + data.len() / 2);
+    out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    let mut head = vec![usize::MAX; 1 << 15];
+    let mut prev = vec![usize::MAX; data.len()];
+    let mut pos = 0usize;
+    let mut lit_start = 0usize;
+    let flush_lit = |out: &mut Vec<u8>, start: usize, end: usize| {
+        let mut cur = start;
+        while cur < end {
+            let chunk = (end - cur).min(128);
+            out.push((chunk - 1) as u8);
+            out.extend_from_slice(&data[cur..cur + chunk]);
+            cur += chunk;
+        }
+    };
+    let hash3 = |i: usize| {
+        ((usize::from(data[i]) * 2654435761)
+            ^ (usize::from(data[i + 1]) * 2246822519)
+            ^ (usize::from(data[i + 2]) * 3266489917))
+            & ((1 << 15) - 1)
+    };
+    while pos < data.len() {
+        let mut best_len = 0usize;
+        let mut best_off = 0usize;
+        if pos + 3 <= data.len() {
+            let h = hash3(pos);
+            let mut cand = head[h];
+            let mut steps = 0;
+            while cand != usize::MAX && pos - cand <= 65535 && steps < 24 {
+                if data[cand..cand + 3] == data[pos..pos + 3] {
+                    let max_len = (data.len() - pos).min(130);
+                    let mut len = 3;
+                    while len < max_len && data[cand + len] == data[pos + len] {
+                        len += 1;
+                    }
+                    if len > best_len {
+                        best_len = len;
+                        best_off = pos - cand;
+                        if len == 130 {
+                            break;
+                        }
+                    }
+                }
+                cand = prev[cand];
+                steps += 1;
+            }
+        }
+        if best_len >= 4 {
+            flush_lit(&mut out, lit_start, pos);
+            out.push(0x80 | (best_len - 3) as u8);
+            out.extend_from_slice(&(best_off as u16).to_le_bytes());
+            for i in pos..pos + best_len {
+                if i + 3 <= data.len() {
+                    let h = hash3(i);
+                    prev[i] = head[h];
+                    head[h] = i;
+                }
+            }
+            pos += best_len;
+            lit_start = pos;
+        } else {
+            if pos + 3 <= data.len() {
+                let h = hash3(pos);
+                prev[pos] = head[h];
+                head[h] = pos;
+            }
+            pos += 1;
+        }
+    }
+    flush_lit(&mut out, lit_start, pos);
+    assert_eq!(decode_lz(&out), data, "LZ round-trip mismatch");
+    fs::write(path, out).unwrap();
+}
+
+fn decode_lz(src: &[u8]) -> Vec<u8> {
+    let total = u32::from_le_bytes(src[..4].try_into().unwrap()) as usize;
+    let mut dst = Vec::with_capacity(total);
+    let mut i = 4usize;
+    while i < src.len() {
+        let tag = src[i];
+        i += 1;
+        if tag < 0x80 {
+            let len = usize::from(tag) + 1;
+            dst.extend_from_slice(&src[i..i + len]);
+            i += len;
+        } else {
+            let len = usize::from(tag & 0x7f) + 3;
+            let off = usize::from(u16::from_le_bytes([src[i], src[i + 1]]));
+            i += 2;
+            let start = dst.len() - off;
+            for k in 0..len {
+                let b = dst[start + k];
+                dst.push(b);
+            }
+        }
+    }
+    dst
 }
 
 // The object in each cell is a connected silhouette. Keep its largest opaque

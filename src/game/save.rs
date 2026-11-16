@@ -27,6 +27,8 @@ struct Save {
     town: Option<TownSave>,
     fort: Option<Fort>,
     quests: town::Progress,
+    #[serde(default)]
+    island_quests: [town::Progress; 4],
     campaign: Campaign,
     goods: Goods,
 }
@@ -109,6 +111,7 @@ impl Game {
             }),
             fort: world.fort.clone(),
             quests: world.town_progress,
+            island_quests: world.island_progress,
             campaign: world.campaign.clone(),
             goods: self.goods.clone(),
         })
@@ -163,14 +166,22 @@ impl Save {
         {
             return None;
         }
-        for (index, states) in self.quests.iter().enumerate() {
-            for (story, state) in town::plan(index).stories.iter().zip(states) {
-                match *state {
-                    State::Active(beat) if beat >= story.beat_count() => return None,
-                    State::Done(choice) if choice > usize::from(story.choices.is_some()) => {
-                        return None
+        for (region, progress) in [
+            (Region::Nox, &self.quests),
+            (Region::Celestia, &self.island_quests[0]),
+            (Region::Sylva, &self.island_quests[1]),
+            (Region::Liberta, &self.island_quests[2]),
+            (Region::Vulcan, &self.island_quests[3]),
+        ] {
+            for (index, states) in progress.iter().enumerate() {
+                for (story, state) in town::plan(region, index).stories.iter().zip(states) {
+                    match *state {
+                        State::Active(beat) if beat >= story.beat_count() => return None,
+                        State::Done(choice) if choice > usize::from(story.choices.is_some()) => {
+                            return None
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
         }
@@ -195,6 +206,7 @@ impl Save {
         let world = &mut game.world_map;
         world.selected = self.region;
         world.town_progress = self.quests;
+        world.island_progress = self.island_quests;
         world.campaign = self.campaign;
         if let Some(saved) = self.island {
             let mut island = Island::new(self.region);
@@ -216,17 +228,20 @@ impl Save {
             let Tile::Settlement(index) = island.tile(island.x, island.y) else {
                 return None;
             };
-            if self.region != Region::Nox || index >= town::COUNT || saved.tracked >= 5 {
+            if index >= town::COUNT || saved.tracked >= 5 {
                 return None;
             }
-            let mut town = Town::new(index, &world.town_progress[index]);
+            let states = world.region_progress(self.region)[index];
+            let mut town = Town::new(self.region, index, &states);
             town.restore_exploration(saved.tracked, saved.track_side, saved.low_tide);
             if !town.landscape.walkable(saved.position) {
                 return None;
             }
             town.pos = saved.position;
             town.facing = saved.facing;
-            town.main = world.campaign.beat();
+            if self.region == Region::Nox {
+                town.main = world.campaign.beat();
+            }
             world.town = Some(town);
         }
         if let Some(fort) = self.fort {

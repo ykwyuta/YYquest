@@ -51,8 +51,8 @@ impl Menu {
             Page::Islands => "島を選ぶ",
             Page::Sites(region) => region.caption().0,
             Page::StoryTowns => "ノクスのサイドストーリー",
-            Page::Stories(town) => town::plan(town).name,
-            Page::Beats(town, story) => town::plan(town).stories[story].title,
+            Page::Stories(town) => town::plan(Region::Nox, town).name,
+            Page::Beats(town, story) => town::plan(Region::Nox, town).stories[story].title,
             Page::Prologue => "序章のイベント",
         }
     }
@@ -69,15 +69,15 @@ impl Menu {
                 .map(|site| site.landmark.name)
                 .collect(),
             Page::StoryTowns => (0..town::COUNT)
-                .map(|index| town::plan(index).name)
+                .map(|index| town::plan(Region::Nox, index).name)
                 .collect(),
-            Page::Stories(index) => town::plan(index)
+            Page::Stories(index) => town::plan(Region::Nox, index)
                 .stories
                 .iter()
                 .map(|story| story.title)
                 .collect(),
             Page::Beats(index, story) => {
-                let plan = town::plan(index);
+                let plan = town::plan(Region::Nox, index);
                 let story = &plan.stories[story];
                 return (0..story.beat_count())
                     .map(|beat| {

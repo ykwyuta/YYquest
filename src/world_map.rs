@@ -107,6 +107,7 @@ pub(crate) struct WorldMap {
     pub(crate) island: Option<Island>,
     pub(crate) town: Option<Town>,
     pub(crate) town_progress: town::Progress,
+    pub(crate) island_progress: [town::Progress; 4],
     pub(crate) campaign: Campaign,
     pub(crate) fort: Option<Fort>,
 }
@@ -118,8 +119,29 @@ impl WorldMap {
             island: None,
             town: None,
             town_progress: Default::default(),
+            island_progress: Default::default(),
             campaign: Campaign::default(),
             fort: None,
+        }
+    }
+
+    pub(crate) fn region_progress(&self, region: Region) -> &town::Progress {
+        match region {
+            Region::Nox => &self.town_progress,
+            Region::Celestia => &self.island_progress[0],
+            Region::Sylva => &self.island_progress[1],
+            Region::Liberta => &self.island_progress[2],
+            Region::Vulcan => &self.island_progress[3],
+        }
+    }
+
+    pub(crate) fn region_progress_mut(&mut self, region: Region) -> &mut town::Progress {
+        match region {
+            Region::Nox => &mut self.town_progress,
+            Region::Celestia => &mut self.island_progress[0],
+            Region::Sylva => &mut self.island_progress[1],
+            Region::Liberta => &mut self.island_progress[2],
+            Region::Vulcan => &mut self.island_progress[3],
         }
     }
 
@@ -137,14 +159,15 @@ impl WorldMap {
 
     pub(crate) fn confirm(&mut self) {
         if let Some(island) = &self.island {
-            if island.region == Region::Nox {
-                if let Tile::Settlement(index) = island.tile(island.x, island.y) {
-                    if index < town::COUNT {
-                        let mut town = Town::new(index, &self.town_progress[index]);
+            if let Tile::Settlement(index) = island.tile(island.x, island.y) {
+                if index < town::COUNT {
+                    let states = self.region_progress(island.region)[index];
+                    let mut town = Town::new(island.region, index, &states);
+                    if island.region == Region::Nox {
                         town.main = self.campaign.beat();
-                        self.town = Some(town);
-                        return;
                     }
+                    self.town = Some(town);
+                    return;
                 }
             }
             if island
@@ -166,13 +189,12 @@ impl WorldMap {
         {
             return Some(beat.site);
         }
-        if island.region != Region::Nox {
-            return None;
+        if island.region == Region::Nox {
+            if let Some(beat) = self.campaign.beat() {
+                return Some(beat.site);
+            }
         }
-        if let Some(beat) = self.campaign.beat() {
-            return Some(beat.site);
-        }
-        self.town_progress
+        self.region_progress(island.region)
             .iter()
             .enumerate()
             .filter(|(_, states)| {
@@ -199,12 +221,20 @@ impl WorldMap {
     }
 
     pub(crate) fn town_input(&mut self, key: Key) -> Option<Service> {
-        let town = self.town.as_mut()?;
-        match town.input(key, &mut self.town_progress[town.index]) {
+        let (region, index) = {
+            let town = self.town.as_ref()?;
+            (town.region, town.index)
+        };
+        let mut states = self.region_progress(region)[index];
+        let travel = self.town.as_mut()?.input(key, &mut states);
+        self.region_progress_mut(region)[index] = states;
+        match travel {
             Travel::Stay => {}
             Travel::AdvanceMain => {
                 self.campaign.advance();
-                town.main = self.campaign.beat();
+                if let Some(town) = &mut self.town {
+                    town.main = self.campaign.beat();
+                }
             }
             Travel::Island => self.town = None,
             Travel::Sea => {

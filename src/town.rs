@@ -1,14 +1,19 @@
+mod celestia;
 mod gathering;
+mod liberta;
 mod map;
 mod nox;
+mod sylva;
 #[cfg(test)]
 mod tests;
+mod vulcan;
 
 use crate::{
     campaign::ChapterBeat,
     dialogue::{Delivery, Expression, Speaker},
     economy::Service,
     walk::Walk,
+    world_map::Region,
 };
 use crate::{
     game::{Facing, Key},
@@ -32,11 +37,13 @@ pub(crate) enum Art {
     Clock,
     Stalls,
     Cottage,
+    Landmark,
 }
 
 impl Art {
     pub(crate) fn size(self) -> i32 {
         match self {
+            Self::Landmark => 64,
             Self::StoneGate | Self::Palisade | Self::Inn => 62,
             Self::Cottage | Self::Well | Self::Stalls => 37,
             _ => 49,
@@ -119,8 +126,14 @@ pub(crate) struct Plan {
 
 pub(crate) const COUNT: usize = NOX.len();
 
-pub(crate) fn plan(index: usize) -> &'static Plan {
-    &NOX[index]
+pub(crate) fn plan(region: Region, index: usize) -> &'static Plan {
+    match region {
+        Region::Nox => &NOX[index],
+        Region::Celestia => &celestia::CELESTIA[index],
+        Region::Sylva => &sylva::SYLVA[index],
+        Region::Liberta => &liberta::LIBERTA[index],
+        Region::Vulcan => &vulcan::VULCAN[index],
+    }
 }
 pub(crate) type Progress = [[State; 5]; COUNT];
 
@@ -201,6 +214,7 @@ pub(crate) enum Action {
 }
 
 pub(crate) struct Town {
+    pub(crate) region: Region,
     pub(crate) index: usize,
     pub(crate) pos: Position,
     pub(crate) facing: Facing,
@@ -222,22 +236,23 @@ impl Town {
     pub(crate) fn restore_exploration(&mut self, tracked: usize, side: bool, low_tide: bool) {
         self.tracked = tracked;
         self.track_side = side;
-        self.low_tide = low_tide && self.index == 1;
+        self.low_tide = low_tide && self.region == Region::Nox && self.index == 1;
         if self.low_tide {
             self.landscape.set_low_tide(true);
         }
     }
 
-    pub(crate) fn new(index: usize, states: &[State; 5]) -> Self {
-        let plan = &NOX[index];
-        let mut landscape = map::TownMap::new(plan, index);
-        landscape.apply_outcome(index, states[0]);
+    pub(crate) fn new(region: Region, index: usize, states: &[State; 5]) -> Self {
+        let plan = plan(region, index);
+        let mut landscape = map::TownMap::new(plan, region, index);
+        landscape.apply_outcome(region, index, states[0]);
         let tracked = states
             .iter()
             .position(|state| matches!(state, State::Active(_)))
             .or_else(|| states.iter().position(|state| *state == State::New))
             .unwrap_or(0);
         Self {
+            region,
             index,
             pos: plan.entry,
             facing: Facing::South,
@@ -253,7 +268,7 @@ impl Town {
     }
 
     pub(crate) fn plan(&self) -> &'static Plan {
-        plan(self.index)
+        plan(self.region, self.index)
     }
 
     pub(crate) fn main_here(&self) -> Option<&'static ChapterBeat> {
@@ -326,6 +341,12 @@ impl Town {
         place: usize,
         states: &[State; 5],
     ) -> impl Iterator<Item = Action> {
+        let can_sail = match (self.region, self.index, place) {
+            (Region::Nox, 1, 7) => true,
+            (Region::Celestia | Region::Liberta | Region::Vulcan, 0, 0) => true,
+            (Region::Sylva, 1, 0) => true,
+            _ => false,
+        };
         self.main_here()
             .filter(|beat| beat.place == Some(place))
             .map(|_| Action::Main)
@@ -333,9 +354,12 @@ impl Town {
             .chain(self.local_stories(place, states).map(Action::Story))
             .chain(std::iter::once(Action::Look))
             .chain((place == 0).then_some(Action::Profile))
-            .chain(Service::at(self.index, place).map(Action::Service))
-            .chain((self.index == 1 && (place == 1 || place == 2)).then_some(Action::WaitForTide))
-            .chain((self.index == 1 && place == 7).then_some(Action::Sail))
+            .chain(Service::at(self.region, self.index, place).map(Action::Service))
+            .chain(
+                (self.region == Region::Nox && self.index == 1 && (place == 1 || place == 2))
+                    .then_some(Action::WaitForTide),
+            )
+            .chain(can_sail.then_some(Action::Sail))
     }
 
     pub(crate) fn step(&mut self, dx: i32, dy: i32) {
@@ -523,7 +547,8 @@ impl Town {
         states[index] = State::Done(result);
         self.tracked = index;
         if index == 0 {
-            self.landscape.apply_outcome(self.index, states[index]);
+            self.landscape
+                .apply_outcome(self.region, self.index, states[index]);
         }
     }
 }

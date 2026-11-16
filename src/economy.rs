@@ -153,13 +153,30 @@ pub(crate) enum Service {
 }
 
 impl Service {
-    pub(crate) fn at(town: usize, place: usize) -> Option<Self> {
-        Some(match (town, place) {
-            (0, 0) | (8, 2) => Self::Rest(0),
-            (6, 0) => Self::Rest(8),
-            (1, 1) | (2, 1) | (9, 2) => Self::Shop,
-            (0, 7) => Self::Brew,
-            (5, 1) => Self::Forge,
+    pub(crate) fn at(region: Region, town: usize, place: usize) -> Option<Self> {
+        Some(match (region, town, place) {
+            (Region::Nox, 0, 0) | (Region::Nox, 8, 2) => Self::Rest(0),
+            (Region::Nox, 6, 0) => Self::Rest(8),
+            (Region::Nox, 1, 1) | (Region::Nox, 2, 1) | (Region::Nox, 9, 2) => Self::Shop,
+            (Region::Nox, 0, 7) => Self::Brew,
+            (Region::Nox, 5, 1) => Self::Forge,
+            (Region::Celestia, 0, 2) | (Region::Celestia, 3, 1) | (Region::Celestia, 9, 0) => Self::Rest(8),
+            (Region::Celestia, 7, 0) => Self::Rest(0),
+            (Region::Celestia, 6, 1) | (Region::Celestia, 0, 0) => Self::Shop,
+            (Region::Celestia, 5, 7) | (Region::Celestia, 7, 6) => Self::Brew,
+            (Region::Sylva, 5, 2) | (Region::Sylva, 0, 6) => Self::Rest(8),
+            (Region::Sylva, 5, 3) => Self::Rest(0),
+            (Region::Sylva, 7, 0) | (Region::Sylva, 1, 1) => Self::Shop,
+            (Region::Sylva, 7, 2) | (Region::Sylva, 9, 0) => Self::Brew,
+            (Region::Sylva, 8, 0) => Self::Forge,
+            (Region::Liberta, 7, 1) | (Region::Liberta, 7, 2) => Self::Rest(8),
+            (Region::Liberta, 0, 5) => Self::Rest(0),
+            (Region::Liberta, 1, 0) | (Region::Liberta, 6, 0) | (Region::Liberta, 9, 0) => Self::Shop,
+            (Region::Liberta, 2, 2) => Self::Forge,
+            (Region::Vulcan, 7, 0) | (Region::Vulcan, 4, 2) => Self::Rest(8),
+            (Region::Vulcan, 2, 1) => Self::Rest(0),
+            (Region::Vulcan, 9, 0) | (Region::Vulcan, 8, 3) => Self::Shop,
+            (Region::Vulcan, 1, 0) | (Region::Vulcan, 6, 0) => Self::Forge,
             _ => return None,
         })
     }

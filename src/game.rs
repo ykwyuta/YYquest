@@ -504,9 +504,10 @@ impl Game {
                 if key == Key::Confirm && town.gather(&mut self.goods) {
                     return;
                 }
+                let region = town.region;
                 let index = town.index;
-                let previous = self.world_map.town_progress[index];
                 let position = town.pos;
+                let previous = self.world_map.region_progress(region)[index];
                 let was_complete = self.world_map.campaign.complete();
                 if let Some(service) = self.world_map.town_input(key) {
                     self.economy_menu = Some(Menu::service(service));
@@ -521,7 +522,7 @@ impl Game {
                 }
                 for (old, new) in previous
                     .into_iter()
-                    .zip(self.world_map.town_progress[index])
+                    .zip(self.world_map.region_progress(region)[index])
                 {
                     if !matches!(old, crate::town::State::Done(_))
                         && matches!(new, crate::town::State::Done(_))
