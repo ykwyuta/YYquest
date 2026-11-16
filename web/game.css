@@ -61,8 +61,8 @@ canvas {
 #sound-toggle[aria-pressed="false"] { opacity: 0.65; }
 #status { margin: 8px 0 0; text-align: center; font-size: 12px; }
 
-button {
-  appearance: none;
+button { appearance: none; }
+button, select {
   min-inline-size: 44px;
   min-block-size: 44px;
   border: 1px solid #ddd2be80;
@@ -76,7 +76,7 @@ button {
 }
 button:disabled { opacity: 0.65; cursor: wait; }
 button:active { background: #6f573bd9; }
-button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
+:is(button, select):focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
 [hidden] { display: none !important; }
 
 .game-stage {
@@ -89,13 +89,14 @@ button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
   z-index: 1;
   display: flex;
   justify-content: space-between;
-  align-items: end;
+  align-self: center;
+  align-items: center;
   gap: 4px;
   width: var(--screen-width);
   padding: clamp(4px, 1.5vw, 12px);
   pointer-events: none;
 }
-#controls button {
+#controls :is(button, select) {
   inline-size: var(--key);
   block-size: var(--key);
   border-radius: 50%;
@@ -114,6 +115,14 @@ button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
 }
 #controls .directions button { touch-action: none; }
 .game-stage[data-controls="overlay"][data-reading="true"] .directions { visibility: hidden; }
+.game-stage[data-controls="zones"] .directions { display: none; }
+.game-stage[data-controls="zones"] canvas { touch-action: none; }
+.game-stage[data-controls="overlay"][data-reading="true"] #controls {
+  align-self: start;
+  align-items: safe end;
+  /* Field dialogue begins at about 60% of the canvas height. */
+  block-size: 60%;
+}
 .up { grid-area: up; }
 .left { grid-area: left; }
 .down { grid-area: down; }
@@ -124,7 +133,8 @@ button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
     "map sound" auto
     "journal confirm" auto
     "layout layout" auto
-    / var(--key) calc(var(--key) + 8px);
+    / minmax(var(--key), 1fr) calc(var(--key) + 8px);
+  min-inline-size: 116px;
   gap: var(--pad-gap);
   align-items: end;
   font-size: 12px;
@@ -140,8 +150,9 @@ button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
   grid-area: layout;
   inline-size: 100%;
   block-size: auto;
-  padding: 3px;
+  padding: 3px 5px;
   border-radius: 999px;
+  color-scheme: dark;
   font-size: 11px;
 }
 #controls .confirm {
@@ -159,11 +170,16 @@ button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
   grid-template:
     "directions game actions" minmax(0, 1fr)
     / auto minmax(0, 1fr) auto;
+}
+.game-stage[data-controls="zones"]:has(#controls:not([hidden])) {
+  grid-template: "game actions" minmax(0, 1fr) / minmax(0, 1fr) auto;
+}
+.game-stage:is([data-controls="outside"], [data-controls="zones"]):has(#controls:not([hidden])) {
   gap: 8px;
 }
-.game-stage[data-controls="outside"] #controls:not([hidden]) { display: contents; }
+.game-stage:is([data-controls="outside"], [data-controls="zones"]) #controls:not([hidden]) { display: contents; }
 .game-stage[data-controls="outside"] .directions { grid-area: directions; }
-.game-stage[data-controls="outside"] .actions { grid-area: actions; }
+.game-stage:is([data-controls="outside"], [data-controls="zones"]) .actions { grid-area: actions; }
 
 @media (orientation: portrait) and (pointer: coarse) {
   #rotate-tip {
@@ -182,6 +198,9 @@ button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
     grid-template: "game game" auto "directions actions" auto / 1fr 1fr;
     gap: 9px 4px;
   }
+  .game-stage[data-controls="zones"]:has(#controls:not([hidden])) {
+    grid-template: "game" auto "actions" auto / minmax(0, 1fr);
+  }
   .game-stage[data-controls="outside"] .directions { justify-self: start; }
-  .game-stage[data-controls="outside"] .actions { justify-self: end; }
+  .game-stage:is([data-controls="outside"], [data-controls="zones"]) .actions { justify-self: end; }
 }

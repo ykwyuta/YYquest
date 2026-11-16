@@ -7,6 +7,7 @@ const encoder = new TextEncoder();
 const status = document.querySelector("#status");
 const controls = document.querySelector("#controls");
 const stage = document.querySelector(".game-stage");
+const dpad = controls.querySelector(".directions");
 const touchLayout = document.querySelector("#touch-layout");
 const layoutPreference = "yyquest-touch-controls";
 const saveKey = "yyquest-adventure";
@@ -35,14 +36,9 @@ const touchDirections = new Map();
 const directions = new Set([37, 38, 39, 40, 65, 68, 83, 87]);
 let preferredLayout;
 
-function setControlLayout(layout) {
-  stage.dataset.controls = layout;
-  touchLayout.textContent = layout === "outside" ? "操作を画面に戻す" : "操作を画面の外へ";
-}
-
 try {
   const saved = localStorage.getItem(layoutPreference);
-  if (saved === "outside" || saved === "overlay") preferredLayout = saved;
+  if (saved === "outside" || saved === "overlay" || saved === "zones") preferredLayout = saved;
   soundEnabled = localStorage.getItem(soundPreference) !== "off";
 } catch {
   // Touch controls still work when browser storage is unavailable.
@@ -91,15 +87,20 @@ function playSound() {
 }
 
 function applyControlLayout() {
-  setControlLayout(preferredLayout ?? (desktopControls.matches ? "outside" : "overlay"));
+  const layout = preferredLayout ?? (desktopControls.matches ? "outside" : "overlay");
+  if (stage.dataset.controls !== layout) {
+    for (const pointerId of touchDirections.keys()) releasePointerDirection(pointerId);
+    stage.dataset.controls = layout;
+  }
+  touchLayout.value = layout;
   resizeViewport();
 }
 
 applyControlLayout();
 desktopControls.addEventListener("change", applyControlLayout);
 
-touchLayout.addEventListener("click", () => {
-  preferredLayout = stage.dataset.controls === "outside" ? "overlay" : "outside";
+touchLayout.addEventListener("change", () => {
+  preferredLayout = touchLayout.value;
   applyControlLayout();
   try {
     localStorage.setItem(layoutPreference, preferredLayout);
@@ -117,9 +118,11 @@ function resizeViewport() {
       - parseFloat(page.paddingTop) - parseFloat(page.paddingBottom)
       - (parseFloat(page.getPropertyValue("--footer-height")) || 0);
     let available = stage.clientWidth;
-    if (stage.dataset.controls === "outside" && getComputedStyle(controls).display === "contents") {
-      available -= stage.querySelector(".directions").offsetWidth + stage.querySelector(".actions").offsetWidth;
-      available -= 2 * (parseFloat(getComputedStyle(stage).columnGap) || 0);
+    if (getComputedStyle(controls).display === "contents") {
+      const dpadWidth = dpad.offsetWidth;
+      const columnGap = parseFloat(getComputedStyle(stage).columnGap) || 0;
+      available -= dpadWidth + stage.querySelector(".actions").offsetWidth;
+      available -= (dpadWidth ? 2 : 1) * columnGap;
     }
     if (height > 0) width = Math.floor(240 * available / height);
   }
@@ -335,7 +338,6 @@ try {
   mapButton.hidden = !wasm.has_map_control();
   controls.hidden = false;
   soundButton.hidden = !window.AudioContext;
-  touchLayout.hidden = false;
   refreshButton.hidden = !wasm.is_title();
   resizeViewport();
   previousTrafficFrame = performance.now();
@@ -347,7 +349,7 @@ try {
 }
 
 window.addEventListener("keydown", (event) => {
-  if (!wasm || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
+  if (!wasm || event.target === touchLayout || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
   if (event.target instanceof HTMLButtonElement && ["Enter", "Space"].includes(event.code)) return;
   const key = keys.get(event.code) ?? keys.get(event.key);
   if (key === undefined) return;
@@ -375,28 +377,44 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-const dpad = controls.querySelector(".directions");
-dpad.addEventListener("pointerdown", (event) => {
-  const button = event.target.closest("button[data-key]");
-  if (!button || event.button !== 0 || !wasm || refreshButton.disabled) return;
+function pressPointerDirection(event, target, code) {
+  if (event.button !== 0 || !wasm || refreshButton.disabled) return;
   event.preventDefault();
-  button.setPointerCapture(event.pointerId);
-  const code = Number(button.dataset.key);
+  target.setPointerCapture(event.pointerId);
+  unlockSound();
   touchDirections.set(event.pointerId, code);
   pressDirection(code, 3 + event.pointerId);
+}
+
+dpad.addEventListener("pointerdown", (event) => {
+  const button = event.target.closest("button[data-key]");
+  if (button) pressPointerDirection(event, button, Number(button.dataset.key));
 });
 
-function releasePointer(event) {
-  const code = touchDirections.get(event.pointerId);
+canvas.addEventListener("pointerdown", (event) => {
+  if (stage.dataset.controls !== "zones") return;
+  const { left, top, width, height } = canvas.getBoundingClientRect();
+  // Compare relative offsets so the four regions scale with the game canvas.
+  const x = (event.clientX - left) / width - 0.5;
+  const y = (event.clientY - top) / height - 0.5;
+  const code = Math.abs(x) > Math.abs(y) ? (x < 0 ? 37 : 39) : (y < 0 ? 38 : 40);
+  pressPointerDirection(event, canvas, code);
+});
+
+function releasePointerDirection(pointerId) {
+  const code = touchDirections.get(pointerId);
   if (code === undefined) return;
-  touchDirections.delete(event.pointerId);
-  wasm?.release_direction?.(code, 3 + event.pointerId);
+  touchDirections.delete(pointerId);
+  wasm?.release_direction?.(code, 3 + pointerId);
 }
 
 for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
-  dpad.addEventListener(type, releasePointer);
+  stage.addEventListener(type, (event) => releasePointerDirection(event.pointerId));
 }
 dpad.addEventListener("contextmenu", (event) => event.preventDefault());
+canvas.addEventListener("contextmenu", (event) => {
+  if (stage.dataset.controls === "zones") event.preventDefault();
+});
 
 controls.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-key]");
