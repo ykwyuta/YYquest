@@ -83,18 +83,42 @@ fn main() {
         .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
         .collect();
     fs::write(out.join("title.rgb"), title).unwrap();
-    let heroes = load("assets/prologue-characters.png");
     let mut characters = Vec::new();
-    // Each row holds one character facing south, west, east, and north.
-    for row in 0..2 {
-        for col in 0..4 {
-            let cell = map_art::cell(&heroes, 4, 2, col, row);
-            let name = format!("prologue character {row}/{col}");
-            let sprite = fit_sprite(&cell, &name, art_sizes::PORTRAIT);
-            characters.extend(sprite.into_raw());
+    // Each sheet holds both characters facing south, west, east and north.
+    for path in ["assets/prologue-characters.png", "assets/prologue-walk.png"] {
+        let heroes = load(path);
+        for row in 0..2 {
+            for col in 0..4 {
+                let cell = map_art::cell(&heroes, 4, 2, col, row);
+                let name = format!("{path} character {row}/{col}");
+                let sprite = fit_sprite(&cell, &name, art_sizes::PORTRAIT);
+                characters.extend(sprite.into_raw());
+            }
         }
     }
     fs::write(out.join("prologue-characters.rgba"), characters).unwrap();
+    let mut faces = Vec::new();
+    for name in [
+        "allen",
+        "lilith",
+        "hearth",
+        "lightkeeper",
+        "mason",
+        "baldo",
+        "villager",
+        "worker",
+        "guard",
+        "traveler",
+    ] {
+        let atlas = load(&format!("assets/portraits/{name}.png"));
+        for row in 0..2 {
+            for col in 0..5 {
+                let portrait = map_art::cell(&atlas, 5, 2, col, row);
+                faces.extend(fit_sprite(&portrait, name, art_sizes::FACE).into_raw());
+            }
+        }
+    }
+    fs::write(out.join("dialogue-faces.rgba"), faces).unwrap();
     for (name, path) in [
         ("slime", "assets/slime.png"),
         ("bat", "assets/bat.png"),

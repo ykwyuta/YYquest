@@ -70,7 +70,12 @@ impl Frame {
         self.draw_settlements(island, view);
         self.draw_traffic(island, view.camera, view.clip);
         self.draw_fauna(island, view);
-        self.draw_explorer(allen(island.facing), view, player);
+        self.draw_explorer(
+            allen(island.facing, island.walk.alternate()),
+            view,
+            player,
+            island.walk.lift(),
+        );
         let destination = guide_site.map(|index| &island.settlements()[index]);
         if let Some(destination) = destination {
             self.draw_guide(
@@ -141,7 +146,7 @@ impl Frame {
                 );
             }
         }
-        self.label(24, 224, 9, MIST, "矢印 / WASD  移動");
+        self.label(24, 224, 9, MIST, "J 荷袋");
         if island.region == Region::Nox
             && site.is_some_and(|site| matches!(site.kind, Kind::Town | Kind::Harbor))
         {

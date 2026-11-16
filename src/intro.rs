@@ -1,0 +1,58 @@
+use crate::island::Position;
+
+pub(crate) const HEARTH: Position = (3, 2);
+pub(crate) const MEETING: Position = (13, 6);
+pub(crate) const SLUICE: Position = (10, 7);
+pub(crate) const MEMORIAL: Position = (14, 2);
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum Intro {
+    #[default]
+    Hearth,
+    Meeting,
+    Sluice,
+    Memorial,
+    Choice,
+    Return,
+    Nox,
+}
+
+impl Intro {
+    pub(crate) fn destination(self) -> (Position, &'static str) {
+        match self {
+            Self::Hearth => (HEARTH, "案内精霊　炉番に水門のことを聞こう。"),
+            Self::Meeting => (MEETING, "案内精霊　東の森で笛の音を探そう。"),
+            Self::Sluice => (SLUICE, "案内精霊　旧水門へ。"),
+            Self::Memorial => (MEMORIAL, "案内精霊　北の石碑でリリスと落ち合おう。"),
+            Self::Choice => (MEMORIAL, "石碑の前でリリスの返事を聞く。"),
+            Self::Return => (HEARTH, "案内精霊　二人で炉番に報告しよう。"),
+            Self::Nox => (HEARTH, "地図（M）からノクス編の探索に戻れる。"),
+        }
+    }
+
+    pub(crate) fn waiting_lilith(self) -> Position {
+        match self {
+            Self::Hearth | Self::Meeting => MEETING,
+            Self::Sluice => (SLUICE.0 + 1, SLUICE.1),
+            _ => (MEMORIAL.0 - 1, MEMORIAL.1),
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Lesson {
+    Sluice,
+    Memorial,
+}
+
+#[derive(Clone, Copy, Default)]
+pub(crate) enum After {
+    #[default]
+    None,
+    Continue(Intro),
+    Fight(Lesson),
+    Ask,
+    Reply,
+    Recruit,
+    BeginNox,
+}

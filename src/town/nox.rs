@@ -367,9 +367,9 @@ pub(super) static NOX: [Plan; 10] = [
         entry: (276, 121),
         places: [
             Place { name: "アーチ井戸", at: (161, 96), art: Some(Art::Well), ground: Landscape::Square, detail: "煤けた旧村の敷石が、水場の敷居に組み込まれている。" },
-            Place { name: "石工場と拓本台", at: (87, 90), art: Some(Art::Inn), ground: Landscape::Stone, detail: "石を叩いた音と木槌の音が少し違う。" },
+            Place { name: "石工場と拓本台", at: (87, 90), art: Some(Art::Inn), ground: Landscape::Stone, detail: "出張鍛冶師のドワーフ、ブロムが石工の道具を直し、旅人の武具も打つ。" },
             Place { name: "暗渠入口", at: (145, 32), art: Some(Art::Sluice), ground: Landscape::Stone, detail: "上から水が滴る。崩れた区画を避ける石目が残る。" },
-            Place { name: "転用石置場", at: (160, 153), art: None, ground: Landscape::Stone, detail: "旧村の石や、次の家を待つ敷石が積まれる。" },
+            Place { name: "転用石置場", at: (160, 153), art: None, ground: Landscape::Stone, detail: "敷石のそばに、石工が水路掃除で拾った沼鉄鉱が分けてある。" },
             Place { name: "水番所", at: (172, 106), art: Some(Art::Cottage), ground: Landscape::Stone, detail: "水番が濁りと雨漏りの通報を受ける。" },
             Place { name: "段差のある家", at: (206, 77), art: Some(Art::Cottage), ground: Landscape::Stone, detail: "大きな敷石が元の家から使い継がれている。" },
             Place { name: "雨染みの裏路地", at: (199, 123), art: None, ground: Landscape::Stone, detail: "濡れているのは片方の壁だけだ。" },

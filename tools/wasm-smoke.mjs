@@ -7,7 +7,7 @@ let wasm;
 let labels = [];
 let center = 0;
 let expectedWidth = 640;
-const { instance } = await WebAssembly.instantiate(binary, {
+const imports = {
   screen: {
     bitmap(address, width, height) {
       assert.equal(width, expectedWidth);
@@ -20,8 +20,8 @@ const { instance } = await WebAssembly.instantiate(binary, {
       labels.push(decoder.decode(new Uint8Array(wasm.memory.buffer, address, length)));
     },
   },
-});
-wasm = instance.exports;
+};
+wasm = (await WebAssembly.instantiate(binary, imports)).instance.exports;
 
 function press(...keys) {
   for (const key of keys) wasm.key(key);
@@ -36,7 +36,7 @@ function hasTitle() {
 }
 function hasDialogue(line) {
   has(line);
-  assert.ok(!labels.some((text) => text.includes("WASD") || text.includes("東の森へ。") || text.includes("リリスと北の石碑へ。")),
+  assert.ok(!labels.some((text) => text.includes("案内精霊") || text.includes("移動　　決定　会話・調査")),
     labels.join(" / "));
 }
 
@@ -77,6 +77,12 @@ press(enter);
 has("精霊　冬越し小屋へ");
 press(escape);
 has("街・村");
+press(journal);
+has("荷袋");
+has("24銀環");
+has("灰葉の傷薬");
+press(escape);
+has("街・村");
 press(enter);
 has("精霊　冬越し小屋へ");
 press(escape, escape, right, enter);
@@ -86,52 +92,66 @@ has("虚無の海");
 press(escape);
 assert.equal(wasm.is_title(), 1);
 hasTitle();
+// Enter the redesigned tutorial and verify the wide field and overview widths.
 press(enter);
 assert.equal(wasm.is_title(), 0);
-hasDialogue("新聖律歴30年");
+hasDialogue("森から水が届かなくなった");
 assert.equal(wasm.has_map_control(), 0);
 press(enter);
-has("案内精霊　東の森へ。");
+has("炉番に水門");
 expectedWidth = 1060;
 wasm.set_view_width(530);
-has("案内精霊　東の森へ。");
-
+has("炉番に水門");
 expectedWidth = 640;
 press(map);
 has("機工連邦ヴァルカン");
-
 expectedWidth = 1060;
 press(map);
-has("案内精霊　東の森へ。");
-
+has("炉番に水門");
 expectedWidth = 640;
 wasm.set_view_width(320);
-press(journal);
-has("父の最後の言葉");
-press(journal);
 
-// Find the first encounter, use rune magic, then read the changed journal.
-press(down, up, down, up, down, up, down, up, down, up, down);
+press(up);
+assert.equal(wasm.animate_traffic(80), 1);
+press(up, enter);
+hasDialogue("東の森で笛");
+has("炉番");
+assert.equal(wasm.reading_dialogue(), 1);
+press(enter, down, down, ...Array(10).fill(right), down, down, enter);
+hasDialogue("門を持ち上げたい");
+has("リリス");
+assert.ok(!labels.some((text) => text.includes("仲間になった")));
+press(enter, down, left, left, left, enter, enter);
 has("霧のスライム");
+has("HP 12/12");
 press(down, enter);
+has("HP 0/12");
 has("父の最後の言葉");
+press(enter);
+hasDialogue("水が流れ出し");
 press(enter, journal);
 has("記憶が風化した");
 assert.ok(!labels.includes("父の最後の言葉"));
 
-// Follow the road, recruit Lilith, and use spirit magic at the monument.
-press(journal, up, ...Array(10).fill(right), down, down);
-hasDialogue("リリスが仲間になった");
-press(enter);
-has("案内精霊　リリスと北の石碑へ");
-press(up, up, up, right, up);
+press(journal, right, right, right, up, up, up, up, up, right, enter, enter);
 has("忘却の獣");
-press(up, up, enter, enter, enter, enter, enter, enter, enter, enter);
-has("序章　完");
-has("残った記憶  2/3");
-press(enter, left);
-assert.equal(wasm.is_title(), 1);
-hasTitle();
+has("記憶を消費しない");
+press(down, down, enter, enter, enter, enter, enter, enter, enter, enter);
+hasDialogue("三つの灯");
+press(enter);
+hasDialogue("一緒に行く");
+press(enter);
+hasDialogue("私も一緒に行く");
+has("リリス");
+press(enter);
+hasDialogue("リリスが仲間になった");
+press(enter, left, down, down, ...Array(10).fill(left), up, up, enter, enter);
+has("灰灯りの村");
+has("精霊　ガウェイン旧宅へ");
+
+const restarted = await WebAssembly.instantiate(binary, imports);
+wasm = restarted.instance.exports;
+wasm.draw();
 // Open the debug menu via the directional pad, then jump to a town and a story.
 press(up, up, down, down, left, right, left, right);
 assert.equal(wasm.is_title(), 1);
@@ -151,4 +171,4 @@ has("寄合小屋へ");
 press(escape, escape, escape);
 has("デバッグモード");
 
-console.log("Wasm smoke passed (title, island, town story, encounter, journal, companion, ending, debug menu)");
+console.log("Wasm smoke passed (title, island, town story, tutorial, journal, companion, Nox start, debug menu)");

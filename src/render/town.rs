@@ -94,7 +94,10 @@ impl Frame {
                 {
                     continue;
                 }
-                let has_story = town.local_stories(index, states).next().is_some();
+                let has_story = town
+                    .main_here()
+                    .is_some_and(|beat| beat.place == Some(index))
+                    || town.local_stories(index, states).next().is_some();
                 if place.art.is_some() || has_story {
                     let worker = (index + town.index) % 4;
                     frame.art_clipped(art::town_sprite(12 + worker), x + 2, y - 14, 36, view.clip);
@@ -153,9 +156,14 @@ impl Frame {
             self.rect(x + 1, y, 8, 1, GOLD);
         }
 
-        self.draw_explorer(allen(town.facing), view, town.pos);
+        self.draw_explorer(
+            allen(town.facing, town.walk.alternate()),
+            view,
+            town.pos,
+            town.walk.lift(),
+        );
         let destination = town.guide_destination(states);
-        let remaining = if let (Panel::Explore, Some(place)) = (town.panel, destination) {
+        let remaining = if let (Panel::Explore, Some((target, _))) = (town.panel, destination) {
             self.draw_guide(
                 Guidance {
                     area: Area::Town {
@@ -164,7 +172,7 @@ impl Frame {
                         outcome: states[0],
                     },
                     from: town.pos,
-                    to: place.at,
+                    to: target,
                     size: (WIDTH, HEIGHT),
                 },
                 |at| town.landscape.walkable(at),
@@ -213,8 +221,8 @@ impl Frame {
                     self.label(24, 196, 11, GOLD, area);
                     self.label(24, 210, 10, IVORY, "街の施設や住民を訪ねよう");
                 }
-                if let Some(place) = destination {
-                    let mut route = format!("精霊　{}へ", place.name);
+                if let Some((_, name)) = destination {
+                    let mut route = format!("精霊　{name}へ");
                     if let Some(steps) = remaining {
                         if steps == 0 {
                             route.push_str("　到着");
@@ -235,10 +243,12 @@ impl Frame {
                     .local_actions(place, states)
                     .map(|action| match action {
                         Action::Story(index) => plan.stories[index].title,
+                        Action::Main => town.main_here().unwrap().title,
                         Action::Look => "この場所について",
                         Action::Profile => "街の取り決め",
                         Action::WaitForTide => "潮が変わるのを待つ",
                         Action::Sail => "出港して全体図へ",
+                        Action::Service(service) => service.label(),
                     })
                     .enumerate()
                 {
@@ -252,16 +262,23 @@ impl Frame {
                 }
                 self.label(24, 211, 9, MIST, "上下  選ぶ　　決定  読む　　M  閉じる");
             }
-            Panel::Talk { title, text, next } => {
-                self.panel(20, 44, 280, 143);
-                self.label(33, 54, 12, GOLD, title);
-                self.wrapped_town_text(33, 76, text, 23, 5);
+            Panel::Talk {
+                title,
+                text,
+                face,
+                next,
+            } => {
+                let width = (self.width as i32 - 20).min(344);
+                let x = (self.width as i32 - width) / 2;
+                self.panel(x, 35, width, 153);
+                self.label(x + 11, 43, 12, GOLD, title);
+                self.dialogue_content((x + 11, 62), width - 22, &[text], face);
                 if let Followup::Choose(index, pick) = next {
                     let choices = plan.stories[index].choices.as_ref().unwrap();
                     for (i, choice) in choices.iter().enumerate() {
                         self.label(
-                            33,
-                            150 + 15 * i as i32,
+                            x + if face.is_some() { 89 } else { 11 },
+                            151 + 15 * i as i32,
                             11,
                             if i == pick { MINT } else { IVORY },
                             format!("{}　{}", if i == pick { "▶" } else { "　" }, choice.label),
@@ -357,7 +374,14 @@ impl Frame {
         self.label(24, 208, 9, MIST, "上下  話を選ぶ　　決定 / J  閉じる");
     }
 
-    fn wrapped_town_text(&mut self, x: i32, y: i32, text: &str, width: usize, lines: usize) {
+    pub(super) fn wrapped_town_text(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        width: usize,
+        lines: usize,
+    ) {
         let chars: Vec<_> = text.chars().collect();
         for (i, row) in chars.chunks(width).take(lines).enumerate() {
             self.label(

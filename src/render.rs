@@ -1,9 +1,11 @@
 use crate::game::{Enemy, Facing, Game, Scene, COMMANDS, MAX_HP, MEMORIES};
 
 mod debug;
+mod economy;
 mod guide;
 mod island;
 mod map_art;
+mod portrait;
 mod sprite;
 mod town;
 mod traffic;
@@ -36,18 +38,18 @@ const _: () = {
     assert!(art_sizes::TITLE_HEIGHT == BUFFER_HEIGHT);
 };
 
-fn allen(facing: Facing) -> Sprite {
-    character_sprite(facing as usize)
+fn allen(facing: Facing, alternate: bool) -> Sprite {
+    character_sprite(8 * usize::from(alternate) + facing as usize)
 }
 
-fn lilith(facing: Facing) -> Sprite {
-    character_sprite(4 + facing as usize)
+fn lilith(facing: Facing, alternate: bool) -> Sprite {
+    character_sprite(8 * usize::from(alternate) + 4 + facing as usize)
 }
 
 fn character_sprite(index: usize) -> Sprite {
     const SIDE: usize = art_sizes::PORTRAIT;
     const STRIDE: usize = SIDE * SIDE * 4;
-    const ATLAS: &[u8; 8 * STRIDE] =
+    const ATLAS: &[u8; 16 * STRIDE] =
         include_bytes!(concat!(env!("OUT_DIR"), "/prologue-characters.rgba"));
     Sprite::new(&ATLAS[index * STRIDE..(index + 1) * STRIDE], SIDE)
 }
@@ -200,6 +202,9 @@ impl Frame {
         self.labels.clear();
         if game.map_open {
             self.draw_world_map(&game.world_map);
+            if let Some(menu) = &game.economy_menu {
+                self.draw_economy(menu, &game.goods, game.goods.hp);
+            }
             return;
         }
         match game.scene {
@@ -209,6 +214,9 @@ impl Frame {
             Scene::Battle => self.battle(game),
             Scene::Defeat => self.conclusion(game, false),
             Scene::Ending => self.conclusion(game, true),
+        }
+        if let Some(menu) = &game.economy_menu {
+            self.draw_economy(menu, &game.goods, game.hp);
         }
     }
 
@@ -248,7 +256,7 @@ impl Frame {
         self.labels.last_mut().unwrap().serif = true;
         self.rect(21, 112, 143, 1, bronze);
         self.rect(21, 111, 26, 3, 0xc09a6a);
-        self.label(22, 123, 11, 0xe4cda4, "序章　辺境の残響");
+        self.label(22, 123, 11, 0xe4cda4, "第一章　帰らなかった灯");
         self.label(21, 149, 13, 0xffdc9e, "▶　旅をはじめる");
         self.label(23, 173, 9, 0xe2d6c2, "Enter / Z で決定");
         self.label(23, 188, 9, 0xe2d6c2, "M  ワールドマップ");
@@ -269,14 +277,36 @@ impl Frame {
             IVORY,
             format!("アレン  HP {:02}/{}", game.hp, MAX_HP),
         );
-        self.draw_prologue_landscape(view, game.lilith);
+        self.draw_prologue_landscape(view);
         if let Some(at) = game.companion_position {
             let (x, y) = view.feet(at);
-            self.art_clipped(lilith(game.companion_facing), x - 14, y - 28, 28, view.clip);
+            self.art_clipped(
+                lilith(game.companion_facing, game.companion_walk.alternate()),
+                x - 14,
+                y - 28 - game.companion_walk.lift(),
+                28,
+                view.clip,
+            );
+        } else if !game.lilith {
+            let at = game.intro.waiting_lilith();
+            let (x, y) = view.feet(at);
+            let offset = if at == player { 12 } else { 0 };
+            self.art_clipped(
+                lilith(Facing::South, false),
+                x - 14 + offset,
+                y - 28,
+                28,
+                view.clip,
+            );
         }
-        self.draw_explorer(allen(game.facing), view, player);
-        if game.message.is_none() && !game.journal {
-            let target = if game.lilith { (14, 2) } else { (13, 6) };
+        self.draw_explorer(
+            allen(game.facing, game.walk.alternate()),
+            view,
+            player,
+            game.walk.lift(),
+        );
+        if game.message.is_none() && !game.journal && game.intro != crate::intro::Intro::Nox {
+            let target = game.intro.destination().0;
             self.draw_guide(
                 guide::Guidance {
                     area: guide::Area::Prologue,
@@ -290,25 +320,30 @@ impl Frame {
                 view.clip,
             );
         }
-        if let Some([first, second]) = game.message {
-            self.panel(view.left - 1, 191, view.width() + 2, 46);
-            self.label(view.left + 8, 196, 11, IVORY, first);
-            self.label(view.left + 8, 211, 11, IVORY, second);
-            self.label(view.clip[2] - 54, 225, 9, GOLD, "▼ 決定");
+        if let Some(message) = game.message {
+            if message.face.is_some() {
+                self.panel(view.left - 1, 143, view.width() + 2, 94);
+                self.dialogue_content(
+                    (view.left + 9, 153),
+                    view.width() - 18,
+                    &message.lines,
+                    message.face,
+                );
+            } else {
+                self.panel(view.left - 1, 191, view.width() + 2, 46);
+                self.label(view.left + 8, 196, 11, IVORY, message.lines[0]);
+                self.label(view.left + 8, 211, 11, IVORY, message.lines[1]);
+            }
+            self.label(view.clip[0] + 12, 225, 9, GOLD, "▼ 決定");
         } else {
             self.panel(view.left - 1, 191, view.width() + 2, 46);
-            let objective = if game.lilith {
-                "案内精霊　リリスと北の石碑へ。"
-            } else {
-                "案内精霊　東の森へ。かまどで回復できます。"
-            };
-            self.label(24, 196, 11, IVORY, objective);
+            self.label(24, 196, 11, IVORY, game.intro.destination().1);
             self.label(
                 24,
                 214,
                 9,
                 MIST,
-                "矢印 / WASD  移動     J  手記     M  地図",
+                "矢印　移動　　決定　会話・調査　　J　手記",
             );
         }
         if game.journal {
@@ -338,14 +373,21 @@ impl Frame {
         self.landscape(0, 23, 320, 125);
         self.rect(114, 122, 92, 3, 0x283449);
         self.art(art, 112, 34, 96);
-        self.label(16, 6, 12, GOLD, battle.enemy.name());
+        let enemy_name = battle.enemy.name();
+        let name_size = if enemy_name.chars().count() > 9 { 9 } else { 11 };
+        self.label(16, 5, name_size, GOLD, enemy_name);
+        let enemy_max = battle.enemy.hp();
+        self.label(125, 7, 9, IVORY, format!("HP {}/{enemy_max}", battle.hp));
         self.label(
             207,
-            9,
+            7,
             10,
             IVORY,
             format!("アレン  HP {:02}/{}", game.hp, MAX_HP),
         );
+        self.hp_gauge(16, 18, 152, battle.hp, enemy_max, RED);
+        let color = if game.hp * 4 <= MAX_HP { RED } else { MINT };
+        self.hp_gauge(207, 18, 96, game.hp, MAX_HP, color);
         self.label(
             18,
             136,
@@ -353,16 +395,21 @@ impl Frame {
             MIST,
             format!("記憶  {}/{}", game.memories, MEMORIES.len()),
         );
+        if let Some(tip) = game.lesson_tip() {
+            self.label(89, 136, 9, MINT, tip);
+        }
         self.panel(15, 155, 290, 74);
         if let Some([first, second]) = &battle.log {
             self.label(24, 166, 12, IVORY, first.as_str());
             self.label(24, 185, 11, IVORY, second.as_str());
-            self.label(248, 209, 9, GOLD, "▼ 決定");
+            self.label(24, 209, 9, GOLD, "▼ 決定");
         } else {
-            for (i, command) in COMMANDS.iter().enumerate() {
+            let extra = battle.expedition().then_some("道具");
+            let spacing = if battle.expedition() { 13 } else { 15 };
+            for (i, command) in COMMANDS.into_iter().chain(extra).enumerate() {
                 let enabled = match i {
                     1 => game.memories > 0,
-                    2 => game.lilith,
+                    2 => game.can_resonate(),
                     _ => true,
                 };
                 let color = if !enabled {
@@ -375,7 +422,7 @@ impl Frame {
                 let marker = if i == battle.selected { "▶" } else { "　" };
                 self.label(
                     22,
-                    161 + i as i32 * 15,
+                    161 + i as i32 * spacing,
                     10,
                     color,
                     format!("{marker} {command}"),
@@ -384,9 +431,11 @@ impl Frame {
             let help = match battle.selected {
                 1 if game.memories > 0 => "大きな一撃。記憶をひとつ失う。",
                 1 => "燃やせる記憶が残っていない。",
-                2 if game.lilith => "リリスが森の精霊を呼ぶ。",
+                2 if game.can_resonate() => "リリスが森の精霊を呼ぶ。",
                 2 => "リリスが仲間になると使える。",
                 3 => "敵の反撃を弱める。",
+                4 => "回復薬や魔道具を使う。",
+                _ if battle.expedition() => "装備した武器で攻撃する。",
                 _ => "錆びた大剣で斬りつける。",
             };
             self.rect(115, 166, 1, 52, LINE);
@@ -395,16 +444,23 @@ impl Frame {
         }
     }
 
+    fn hp_gauge(&mut self, x: i32, y: i32, width: i32, hp: u8, max: u8, color: u32) {
+        let filled = (width - 2) * i32::from(hp.min(max)) / i32::from(max);
+        self.rect(x, y, width, 5, LINE);
+        self.rect(x + 1, y + 1, width - 2, 3, INK);
+        self.rect(x + 1, y + 1, filled, 3, color);
+    }
+
     fn conclusion(&mut self, game: &Game, won: bool) {
         self.landscape(0, 0, 320, 144);
         let (title, color, first, second) = if won {
-            self.art(allen(Facing::South), 109, 73, 56);
-            self.art(lilith(Facing::South), 155, 74, 56);
+            self.art(allen(Facing::South, false), 109, 73, 56);
+            self.art(lilith(Facing::South, false), 155, 74, 56);
             (
-                "序章　完",
+                "第一章　ノクス　完",
                 GOLD,
-                "石碑に残るのは、かつての戦いの残響。",
-                "「この先で、わたしの記憶を探してもいい？」",
+                "救助の記録は、霧灯の港に残った。",
+                "二人の次の目的地は聖律皇国セレスティア。",
             )
         } else {
             (
@@ -428,6 +484,16 @@ impl Frame {
                 format!("残った記憶  {}/{}", game.memories, MEMORIES.len()),
             );
         }
-        self.label(180, 205, 10, GOLD, "Enter  題名へ");
+        self.label(
+            180,
+            205,
+            10,
+            GOLD,
+            if won {
+                "決定　次の航路へ"
+            } else {
+                "Enter　題名へ"
+            },
+        );
     }
 }

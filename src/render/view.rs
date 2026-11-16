@@ -53,7 +53,7 @@ impl View {
 }
 
 impl Frame {
-    pub(super) fn draw_explorer(&mut self, sprite: Sprite, view: View, at: (i32, i32)) {
+    pub(super) fn draw_explorer(&mut self, sprite: Sprite, view: View, at: (i32, i32), lift: i32) {
         let (x, y) = view.feet(at);
         // A light rim at Allen's feet keeps his position readable over any ground.
         self.rect(x - 8, y - 1, 16, 4, INK);
@@ -64,7 +64,7 @@ impl Frame {
         self.art_clipped(
             sprite,
             x - SIZE as i32 / 2,
-            y - SIZE as i32,
+            y - SIZE as i32 - lift,
             SIZE,
             view.clip,
         );

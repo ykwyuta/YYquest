@@ -182,6 +182,7 @@ refreshButton.addEventListener("click", async () => {
 function sendKey(key, repeat = false) {
   if (!wasm || refreshButton.disabled) return;
   wasm.key(key, repeat);
+  stage.dataset.reading = Boolean(wasm.reading_dialogue?.());
   refreshButton.hidden = !wasm.is_title();
   mapButton.textContent = wasm.debug_back_control() ? "戻る" : "地図";
   mapButton.hidden = !wasm.has_map_control();
