@@ -42,7 +42,7 @@ impl Frame {
             Delivery::Speech { name, .. } => (name, GOLD),
             Delivery::Scene => ("状況", MIST),
             Delivery::Record(source) => (source, MINT),
-            Delivery::Guide => ("案内", MINT),
+            Delivery::Guide => ("案内精霊トモル", MINT),
         };
         self.label(text_x, y, 11, accent, header);
         let columns = (text_width / 10).max(1) as usize;
@@ -109,7 +109,7 @@ mod tests {
             ),
             (Delivery::Scene, "状況", false),
             (Delivery::Record("積み荷控え"), "積み荷控え", false),
-            (Delivery::Guide, "案内", false),
+            (Delivery::Guide, "案内精霊トモル", false),
         ] {
             frame.labels.clear();
             frame.dialogue_content(

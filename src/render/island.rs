@@ -143,7 +143,7 @@ impl Frame {
                     210,
                     10,
                     MINT,
-                    format!("案内精霊　{}へ", destination.landmark.name),
+                    format!("案内精霊トモル　{}へ", destination.landmark.name),
                 );
             } else {
                 self.label(

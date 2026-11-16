@@ -62,7 +62,7 @@ pub(super) const STEPS: [VoyageBeat; 12] = [
     VoyageBeat { region: Vulcan, site: 2, title: "共鳴機の試運転", speaker: "ガルダ",
         text: "記憶を吸い出す管はすべて外し、代わりに人々の声を届ける『共鳴機』へ組み替えたぞ。あとは各島の封印をどの順番で鳴らすかが分かればいい。シルヴァの古根の封門で手順を確かめてきてくれ。", event: Event::Read },
     VoyageBeat { region: Sylva, site: 10, title: "第五章　リリスの記憶", speaker: "リリス",
-        text: "思い出した……私は昔、封印を支えた七人の一人だったんだ。調律の順番は分かったけれど、全部の記憶を背負えば今の旅を忘れてしまう。手順はみんなで分け合って覚えよう。潮待ちの港から船を出そう。", event: Event::Read },
+        text: "思い出した……トモルは昔、私がガウェインに預けた森の灯精霊だったんだね。調律の順はみんなで分け合って覚えよう。全部を背負えば今の旅を忘れてしまうから。準備ができたら潮待ちの港へ！", event: Event::Read },
     VoyageBeat { region: Liberta, site: 0, title: "終章　虚無の海へ", speaker: "フィーネ",
         text: "灯台の光が消えたわ、潮が開く合図よ！　船に乗って、虚無の海の神殿へ向かいましょう。封印の奥からアビス・ロードの霧が迫ってきたら、リリスと力を合わせて戦って。準備ができたら出航よ！", event: Event::Read },
     VoyageBeat { region: Liberta, site: 0, title: "虚無の海の神殿", speaker: "ヴァレリウス",

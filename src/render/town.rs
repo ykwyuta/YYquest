@@ -246,7 +246,7 @@ impl Frame {
                     };
                     self.label(24, 223, 9, MINT, notice);
                 } else if let Some((_, name)) = destination {
-                    let mut route = format!("精霊　{name}へ");
+                    let mut route = format!("トモル　{name}へ");
                     if let Some(steps) = remaining {
                         if steps == 0 {
                             route.push_str("　到着");

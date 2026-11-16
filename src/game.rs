@@ -677,8 +677,8 @@ impl Game {
     fn start_prologue(&mut self) {
         self.scene = Scene::Field;
         self.message = Some(Message::narration([
-            "東の森から、灰灯りの村へ水が来なくなった。",
-            "アレンは村の炉を守る「炉番」のもとへ向かう。",
+            "東の森から水が止まり、炉のそばを緑の精霊が舞い始めた。",
+            "案内精霊トモルに導かれ、アレンは「炉番」のもとへ向かう。",
         ]));
     }
 
@@ -790,7 +790,7 @@ impl Game {
                 self.clear_held_direction();
                 self.after = After::None;
                 self.message = Some(Message::guide([
-                    "案内精霊が光で道を照らしている。",
+                    "案内精霊トモルが、三つの光の雫で安全な道を照らしている。",
                     "光のあとをたどって、目的地へ向かおう。",
                 ]));
                 return;
@@ -826,13 +826,13 @@ impl Game {
         self.message = Some(match self.intro {
             Intro::Hearth => {
                 self.hp = MAX_HP;
-                self.after = After::Continue(Intro::Meeting);
+                self.after = After::HearthTask;
                 Message::spoken(
                     Hearth,
-                    Worried,
+                    Thoughtful,
                     [
-                        "森の水路が止まったうえ、東の森から笛の音が聞こえたよ。",
-                        "古い水門は父さんの剣で開けられる。持って見てきておくれ。",
+                        "『トモル』が目覚めたのかい。父さんの剣のそばで眠っていた灯の精霊さ。",
+                        "助けを呼ぶ声や灯の記憶に共鳴して、安全な道を光で示してくれるんだよ。",
                     ],
                 )
             }
@@ -895,6 +895,17 @@ impl Game {
         self.message = None;
         match std::mem::take(&mut self.after) {
             After::None => {}
+            After::HearthTask => {
+                self.message = Some(Message::spoken(
+                    Speaker::Hearth,
+                    Expression::Worried,
+                    [
+                        "森の水路が止まったうえ、東の森から笛の音が聞こえたよ。",
+                        "古い水門は父さんの剣で開けられる。トモルと見てきておくれ。",
+                    ],
+                ));
+                self.after = After::Continue(Intro::Meeting);
+            }
             After::Continue(next) => self.intro = next,
             After::Fight(lesson) => self.start_lesson(lesson),
             After::Ask => {
@@ -968,7 +979,7 @@ impl Game {
                     Speaker::Lilith,
                     Expression::Relieved,
                     [
-                        "水路が通ったね！　……あれ、今アレンの剣が鳴らなかった？",
+                        "水路が通ったね！　……あれ、今アレンの剣とトモルが共鳴しなかった？",
                         "北の石碑からも同じ音が返ってくる。先に様子を見てくるね！",
                     ],
                 )
@@ -1545,7 +1556,7 @@ mod tests {
         use Key::*;
         let mut game = Game::new();
         press(&mut game, &[Confirm, Confirm]);
-        press(&mut game, &[Up, Up, Confirm, Confirm, Down, Down]);
+        press(&mut game, &[Up, Up, Confirm, Confirm, Confirm, Down, Down]);
         press(&mut game, &[Right; 10]);
         press(&mut game, &[Down, Down, Confirm, Confirm]);
         assert_eq!(game.intro, Intro::Sluice);
