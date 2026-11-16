@@ -6,10 +6,11 @@ const decoder = new TextDecoder();
 let wasm;
 let labels = [];
 let center = 0;
+let expectedWidth = 640;
 const { instance } = await WebAssembly.instantiate(binary, {
   screen: {
     bitmap(address, width, height) {
-      assert.equal(width, 640);
+      assert.equal(width, expectedWidth);
       assert.equal(height, 480);
       labels = [];
       const pixels = new Uint32Array(wasm.memory.buffer, address, width * height);
@@ -91,10 +92,20 @@ hasDialogue("新聖律歴30年");
 assert.equal(wasm.has_map_control(), 0);
 press(enter);
 has("案内精霊　東の森へ。");
+expectedWidth = 1060;
+wasm.set_view_width(530);
+has("案内精霊　東の森へ。");
+
+expectedWidth = 640;
 press(map);
 has("機工連邦ヴァルカン");
+
+expectedWidth = 1060;
 press(map);
 has("案内精霊　東の森へ。");
+
+expectedWidth = 640;
+wasm.set_view_width(320);
 press(journal);
 has("父の最後の言葉");
 press(journal);

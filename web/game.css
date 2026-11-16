@@ -11,13 +11,20 @@ body {
 }
 
 main {
-  width: min(1100px, 100%);
-  padding: max(9px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
-    max(9px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  --edge-top: max(9px, env(safe-area-inset-top));
+  --edge-bottom: max(9px, env(safe-area-inset-bottom));
+  --footer-height: 0px;
+  width: 100%;
+  padding: var(--edge-top) max(10px, env(safe-area-inset-right))
+    var(--edge-bottom) max(10px, env(safe-area-inset-left));
 }
 
+main:has(#cache-refresh:not([hidden])) { --footer-height: 52px; }
+
 .game-stage {
-  --screen-width: min(100%, 840px, calc((100dvh - 66px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 4 / 3));
+  --canvas-ratio: 1.333333;
+  --canvas-limit: 840px;
+  --screen-width: min(100%, var(--canvas-limit), calc((100dvh - var(--edge-top) - var(--edge-bottom) - var(--footer-height)) * var(--canvas-ratio)));
   display: grid;
   grid-template: "game" / minmax(0, 1fr);
   justify-items: center;
@@ -29,14 +36,14 @@ canvas {
   display: block;
   width: var(--screen-width);
   height: auto;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--canvas-ratio);
   background: #111524;
   outline: 1px solid #806849;
   box-shadow: 0 12px 36px #03040d80;
 }
 
-#controls, #touch-layout, #rotate-tip { display: none; }
-.toolbar {
+#controls, #rotate-tip, .toolbar { display: none; }
+.toolbar:has(#cache-refresh:not([hidden])) {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -76,7 +83,7 @@ button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
     --key: clamp(44px, 10dvh, 54px);
     --pad-gap: clamp(3px, 1.1vw, 6px);
   }
-  #touch-layout:not([hidden]) { display: inline-flex; align-items: center; }
+
   #controls:not([hidden]) {
     grid-area: game;
     z-index: 1;
@@ -114,6 +121,7 @@ button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
     grid-template:
       "map confirm" var(--key)
       "journal confirm" var(--key)
+      "layout layout" auto
       / var(--key) calc(var(--key) + 8px);
     gap: var(--pad-gap);
     align-items: end;
@@ -121,6 +129,14 @@ button:focus-visible { outline: 2px solid #e9c991; outline-offset: 2px; }
   }
   #map-control { grid-area: map; }
   .journal { grid-area: journal; }
+  #controls #touch-layout {
+    grid-area: layout;
+    inline-size: 100%;
+    block-size: auto;
+    padding: 3px;
+    border-radius: 999px;
+    font-size: 11px;
+  }
   #controls .confirm {
     grid-area: confirm;
     inline-size: calc(var(--key) + 8px);

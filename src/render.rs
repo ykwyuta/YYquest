@@ -7,6 +7,7 @@ mod map_art;
 mod sprite;
 mod town;
 mod traffic;
+mod view;
 mod world_map;
 
 use crate::art_sizes;
@@ -76,6 +77,8 @@ pub struct Frame {
     pub pixels: Vec<u32>,
     pub labels: Vec<Label>,
     guide: Option<guide::Route>,
+    width: usize,
+    exploration_width: usize,
 }
 
 impl Frame {
@@ -84,17 +87,32 @@ impl Frame {
             pixels: vec![0; BUFFER_WIDTH * BUFFER_HEIGHT],
             labels: Vec::new(),
             guide: None,
+            width: WIDTH,
+            exploration_width: WIDTH,
         }
     }
 
+    pub(crate) fn buffer_width(&self) -> usize {
+        self.width * DISPLAY_SCALE
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn set_exploration_width(&mut self, width: usize) -> bool {
+        let width = width.clamp(WIDTH, 560);
+        let changed = width != self.exploration_width;
+        self.exploration_width = width;
+        changed
+    }
+
     fn rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: u32) {
-        let left = x.clamp(0, WIDTH as i32) as usize;
-        let right = (x + w).clamp(0, WIDTH as i32) as usize;
+        let left = x.clamp(0, self.width as i32) as usize;
+        let right = (x + w).clamp(0, self.width as i32) as usize;
         let top = y.clamp(0, HEIGHT as i32) as usize;
         let bottom = (y + h).clamp(0, HEIGHT as i32) as usize;
         let (left, right) = (left * DISPLAY_SCALE, right * DISPLAY_SCALE);
+        let stride = self.buffer_width();
         for row in top * DISPLAY_SCALE..bottom * DISPLAY_SCALE {
-            self.pixels[row * BUFFER_WIDTH + left..row * BUFFER_WIDTH + right].fill(color);
+            self.pixels[row * stride + left..row * stride + right].fill(color);
         }
     }
 
@@ -116,7 +134,7 @@ impl Frame {
     }
 
     fn art(&mut self, sprite: Sprite, x: i32, y: i32, size: usize) {
-        self.art_clipped(sprite, x, y, size, [0, 0, WIDTH as i32, HEIGHT as i32]);
+        self.art_clipped(sprite, x, y, size, [0, 0, self.width as i32, HEIGHT as i32]);
     }
 
     fn art_clipped(&mut self, sprite: Sprite, x: i32, y: i32, size: usize, clip: [i32; 4]) {
@@ -150,6 +168,7 @@ impl Frame {
         flip: bool,
     ) {
         let [left, top, right, bottom] = clip.map(|edge| edge * DISPLAY_SCALE as i32);
+        let stride = self.buffer_width();
         for dy in y.max(top)..(y + target as i32).min(bottom) {
             let row = (dy - y) as usize;
             for dx in x.max(left)..(x + target as i32).min(right) {
@@ -157,7 +176,7 @@ impl Frame {
                 let col = if flip { target - 1 - col } else { col };
                 let sample = sprite.sample(col, row, target);
                 if sample[3] != 0 {
-                    let dest = &mut self.pixels[dy as usize * BUFFER_WIDTH + dx as usize];
+                    let dest = &mut self.pixels[dy as usize * stride + dx as usize];
                     *dest = sprite::over_rgb(sample, *dest);
                 }
             }
@@ -165,6 +184,18 @@ impl Frame {
     }
 
     pub fn draw(&mut self, game: &Game) {
+        let exploring = if game.map_open {
+            game.world_map.island.is_some()
+        } else {
+            matches!(game.scene, Scene::Field)
+        };
+        self.width = if exploring {
+            self.exploration_width
+        } else {
+            WIDTH
+        };
+        self.pixels
+            .resize(self.buffer_width() * BUFFER_HEIGHT, NIGHT);
         self.pixels.fill(NIGHT);
         self.labels.clear();
         if game.map_open {
@@ -224,19 +255,26 @@ impl Frame {
     }
 
     fn field(&mut self, game: &Game) {
-        self.label(16, 7, 12, GOLD, "黄昏の辺境領ノクス");
+        let map_size = (
+            crate::game::MAP[0].len() as i32,
+            crate::game::MAP.len() as i32,
+        );
+        let player = (game.x, game.y);
+        let view = view::View::new(self.width as i32, player, map_size);
+        self.label(view.left, 7, 12, GOLD, "黄昏の辺境領ノクス");
         self.label(
-            222,
+            view.clip[2] - 82,
             9,
             10,
             IVORY,
             format!("アレン  HP {:02}/{}", game.hp, MAX_HP),
         );
-        self.draw_prologue_landscape(game.lilith);
-        if let Some((x, y)) = game.companion_position {
-            self.art(lilith(game.companion_facing), 15 + x * 16, 23 + y * 16, 18);
+        self.draw_prologue_landscape(view, game.lilith);
+        if let Some(at) = game.companion_position {
+            let (x, y) = view.feet(at);
+            self.art_clipped(lilith(game.companion_facing), x - 14, y - 28, 28, view.clip);
         }
-        self.art(allen(game.facing), 15 + game.x * 16, 23 + game.y * 16, 18);
+        self.draw_explorer(allen(game.facing), view, player);
         if game.message.is_none() && !game.journal {
             let target = if game.lilith { (14, 2) } else { (13, 6) };
             self.draw_guide(
@@ -244,24 +282,21 @@ impl Frame {
                     area: guide::Area::Prologue,
                     from: (game.x, game.y),
                     to: target,
-                    size: (
-                        crate::game::MAP[0].len() as i32,
-                        crate::game::MAP.len() as i32,
-                    ),
+                    size: map_size,
                 },
                 Game::field_walkable,
                 |(x, y)| Game::tile(x, y) == b'.',
-                |(x, y)| (24 + x * 16, 34 + y * 16),
-                [16, 25, 304, 185],
+                |at| view.feet(at),
+                view.clip,
             );
         }
         if let Some([first, second]) = game.message {
-            self.panel(15, 174, 290, 55);
-            self.label(24, 180, 11, IVORY, first);
-            self.label(24, 196, 11, IVORY, second);
-            self.label(249, 213, 9, GOLD, "▼ 決定");
+            self.panel(view.left - 1, 191, view.width() + 2, 46);
+            self.label(view.left + 8, 196, 11, IVORY, first);
+            self.label(view.left + 8, 211, 11, IVORY, second);
+            self.label(view.clip[2] - 54, 225, 9, GOLD, "▼ 決定");
         } else {
-            self.panel(15, 191, 290, 37);
+            self.panel(view.left - 1, 191, view.width() + 2, 46);
             let objective = if game.lilith {
                 "案内精霊　リリスと北の石碑へ。"
             } else {
