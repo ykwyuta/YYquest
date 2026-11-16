@@ -1,4 +1,4 @@
-use super::{Frame, Sprite, BUFFER_WIDTH, DISPLAY_SCALE};
+use super::{Frame, Sprite, DISPLAY_SCALE};
 use crate::art_sizes;
 use crate::noise::sample as natural_noise;
 
@@ -192,12 +192,13 @@ impl Frame {
         );
         let size = size * DISPLAY_SCALE as i32;
         let (map_x, map_y) = (tile.0 * size, tile.1 * size);
+        let stride = self.buffer_width();
         let center = materials[4];
         let uniform = materials.iter().all(|&ground| ground == center);
         for py in 0..size {
             for px in 0..size {
                 let (x, y) = (map_x + px, map_y + py);
-                let index = (sy + py) as usize * BUFFER_WIDTH + (sx + px) as usize;
+                let index = (sy + py) as usize * stride + (sx + px) as usize;
                 self.pixels[index] = if uniform || center == Ground::Dock {
                     texture(center, x, y)
                 } else {
@@ -365,7 +366,11 @@ pub(super) fn tree(region: crate::world_map::Region, variation: usize) -> Sprite
 }
 
 fn prologue_ground(x: i32, y: i32) -> Ground {
-    match crate::game::Game::tile(x, y) {
+    let tile = crate::game::MAP
+        .get(y as usize)
+        .and_then(|row| row.get(x as usize))
+        .copied();
+    match tile.unwrap_or(b'~') {
         b'~' => Ground::Sea,
         b'#' => Ground::Woodland,
         b'.' => Ground::Trail,
@@ -376,21 +381,28 @@ fn prologue_ground(x: i32, y: i32) -> Ground {
 }
 
 impl Frame {
-    pub(super) fn draw_prologue_landscape(&mut self, lilith_joined: bool) {
-        use super::lilith;
+    pub(super) fn draw_prologue_landscape(&mut self, view: super::view::View, lilith_joined: bool) {
+        use super::{
+            lilith,
+            view::{ROWS, TILE_SIZE},
+        };
         use crate::game::{Facing, MAP};
 
-        const LEFT: i32 = 16;
-        const TOP: i32 = 25;
-        const CLIP: [i32; 4] = [LEFT, TOP, LEFT + 18 * 16, TOP + 10 * 16];
-        for (row, tiles) in MAP.iter().enumerate() {
-            for col in 0..tiles.len() {
-                let (x, y) = (col as i32, row as i32);
+        self.rect(
+            view.left - 1,
+            view.clip[1] - 1,
+            view.width() + 2,
+            ROWS * TILE_SIZE + 2,
+            super::LINE,
+        );
+        for row in 0..ROWS {
+            for col in 0..view.columns {
+                let (x, y) = (view.camera.0 + col, view.camera.1 + row);
                 self.terrain(
-                    (LEFT + x * 16, TOP + y * 16),
+                    view.point((x, y)),
                     (x, y),
                     around(x, y, prologue_ground),
-                    16,
+                    TILE_SIZE,
                 );
             }
         }
@@ -403,20 +415,21 @@ impl Frame {
                         let variation = (x * 7 + y * 3).rem_euclid(13) as usize;
                         (
                             tree(crate::world_map::Region::Nox, variation),
-                            17 + variation % 6,
+                            25 + variation % 8,
                         )
                     }
-                    b'H' => (COTTAGE, 27),
-                    b'R' => (MEMORIAL, 26),
-                    b'L' if !lilith_joined => (lilith(Facing::South), 18),
+                    b'H' => (COTTAGE, 40),
+                    b'R' => (MEMORIAL, 39),
+                    b'L' if !lilith_joined => (lilith(Facing::South), 28),
                     _ => continue,
                 };
+                let (px, py) = view.feet((x, y));
                 self.art_clipped(
                     sprite,
-                    LEFT + x * 16 + 8 - size as i32 / 2,
-                    TOP + y * 16 + 16 - size as i32,
+                    px - size as i32 / 2,
+                    py - size as i32,
                     size,
-                    CLIP,
+                    view.clip,
                 );
             }
         }

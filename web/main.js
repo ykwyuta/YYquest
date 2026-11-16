@@ -35,12 +35,33 @@ try {
 touchLayout.addEventListener("click", () => {
   const layout = stage.dataset.controls === "outside" ? "overlay" : "outside";
   setControlLayout(layout);
+  resizeViewport();
   try {
     localStorage.setItem(layoutPreference, layout);
   } catch {
     // Keep the selection for the current visit.
   }
 });
+
+function resizeViewport() {
+  if (!wasm?.set_view_width) return;
+  let width = 320;
+  if (matchMedia("(orientation: landscape)").matches) {
+    const page = getComputedStyle(stage.parentElement);
+    const height = (window.visualViewport?.height ?? window.innerHeight)
+      - parseFloat(page.paddingTop) - parseFloat(page.paddingBottom);
+    let available = stage.clientWidth;
+    if (stage.dataset.controls === "outside" && getComputedStyle(controls).display === "contents") {
+      available -= stage.querySelector(".directions").offsetWidth + stage.querySelector(".actions").offsetWidth;
+      available -= 2 * (parseFloat(getComputedStyle(stage).columnGap) || 0);
+    }
+    if (height > 0) width = Math.floor(240 * available / height);
+  }
+  wasm.set_view_width(Math.max(320, width));
+}
+
+window.addEventListener("resize", resizeViewport);
+window.visualViewport?.addEventListener("resize", resizeViewport);
 
 function animateTraffic(now) {
   pollGamepad();
@@ -77,6 +98,8 @@ const screen = {
     if (!image || image.width !== width || image.height !== height) {
       canvas.width = width;
       canvas.height = height;
+      stage.style.setProperty("--canvas-ratio", width / height);
+      stage.style.setProperty("--canvas-limit", width > 640 ? "100%" : "840px");
       image = view.createImageData(width, height);
     }
     const pixels = new Uint32Array(wasm.memory.buffer, address, width * height);
@@ -175,6 +198,7 @@ try {
   status.hidden = true;
   controls.hidden = false;
   touchLayout.hidden = false;
+  resizeViewport();
   previousTrafficFrame = performance.now();
   requestAnimationFrame(animateTraffic);
 } catch (error) {
@@ -193,6 +217,6 @@ window.addEventListener("keydown", (event) => {
 });
 
 controls.addEventListener("click", (event) => {
-  const button = event.target.closest("button");
+  const button = event.target.closest("button[data-key]");
   if (button) sendKey(Number(button.dataset.key));
 });

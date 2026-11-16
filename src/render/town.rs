@@ -1,8 +1,8 @@
 use super::{
     allen,
     guide::{Area, Guidance},
-    island::{COLUMNS, LEFT, ROWS, TILE_SIZE, TOP, VIEW},
     map_art::{self as art, Ground},
+    view::{View, ROWS, TILE_SIZE, TOP, ZOOM},
     Frame, GOLD, INK, IVORY, LINE, MINT, MIST,
 };
 use crate::{
@@ -15,25 +15,18 @@ use crate::{
 impl Frame {
     pub(super) fn draw_town(&mut self, town: &Town, states: &[State; 5]) {
         let plan = town.plan();
-        let camera = (
-            (town.pos.0 - COLUMNS / 2).clamp(0, WIDTH - COLUMNS),
-            (town.pos.1 - ROWS / 2).clamp(0, HEIGHT - ROWS),
-        );
-        let point = |(x, y): Position| {
-            (
-                LEFT + (x - camera.0) * TILE_SIZE,
-                TOP + (y - camera.1) * TILE_SIZE,
-            )
-        };
+        let view = View::new(self.width as i32, town.pos, (WIDTH, HEIGHT));
+        let camera = view.camera;
+        let point = |at| view.point(at);
         self.rect(
-            LEFT - 1,
+            view.left - 1,
             TOP - 1,
-            COLUMNS * TILE_SIZE + 2,
+            view.columns * TILE_SIZE + 2,
             ROWS * TILE_SIZE + 2,
             LINE,
         );
         for row in 0..ROWS {
-            for col in 0..COLUMNS {
+            for col in 0..view.columns {
                 let at = (camera.0 + col, camera.1 + row);
                 self.terrain(
                     point(at),
@@ -48,7 +41,7 @@ impl Frame {
 
         // Low roadside foliage is drawn before buildings and people.
         for row in -1..=ROWS + 2 {
-            for col in -2..=COLUMNS + 2 {
+            for col in -2..=view.columns + 2 {
                 let at = (camera.0 + col, camera.1 + row);
                 let site = town.landscape.surface(at);
                 let v = noise::hash(at.0, at.1 + 53 * town.index as i32);
@@ -75,11 +68,18 @@ impl Frame {
                     continue;
                 }
                 let (x, y) = point(at);
-                self.art_clipped(sprite, x + 6 - side / 2, y + 9 - side, side as usize, VIEW);
+                let side = side * ZOOM;
+                self.art_clipped(
+                    sprite,
+                    x + TILE_SIZE / 2 - side / 2,
+                    y + TILE_SIZE - 3 - side,
+                    side as usize,
+                    view.clip,
+                );
             }
         }
 
-        let player_and_npcs = |frame: &mut Frame, row: i32| {
+        let draw_npcs = |frame: &mut Frame, row: i32| {
             for (index, place) in plan
                 .places
                 .iter()
@@ -87,13 +87,17 @@ impl Frame {
                 .filter(|(_, place)| place.at.1 == row)
             {
                 let (x, y) = point(place.at);
-                if x < LEFT + 2 || x > VIEW[2] - 14 || y < TOP + 10 || y > VIEW[3] - 12 {
+                if x < view.left + 2
+                    || x > view.clip[2] - 14
+                    || y < TOP + 10
+                    || y > view.clip[3] - 12
+                {
                     continue;
                 }
                 let has_story = town.local_stories(index, states).next().is_some();
                 if place.art.is_some() || has_story {
                     let worker = (index + town.index) % 4;
-                    frame.art_clipped(art::town_sprite(12 + worker), x + 1, y - 7, 18, VIEW);
+                    frame.art_clipped(art::town_sprite(12 + worker), x + 2, y - 14, 36, view.clip);
                 }
                 let color =
                     if plan.stories[town.tracked].objective(states[town.tracked]) == Some(index) {
@@ -104,16 +108,13 @@ impl Frame {
                         MIST
                     };
                 let marker = if has_story { 1 } else { 3 };
-                frame.rect(x + 8, y - 10, 3, 6 - marker, INK);
-                frame.rect(x + 9, y - 9, 1, 5 - marker, color);
-                if has_story {
-                    frame.rect(x + 9, y - 3, 1, 1, color);
+                if y >= TOP + 21 {
+                    frame.rect(x + 16, y - 20, 5, 9 - marker, INK);
+                    frame.rect(x + 18, y - 19, 1, 7 - marker, color);
+                    if has_story {
+                        frame.rect(x + 18, y - 10, 1, 1, color);
+                    }
                 }
-            }
-            if town.pos.1 == row {
-                let (x, y) = point(town.pos);
-                frame.rect(x + 2, y + 10, 9, 2, INK);
-                frame.art_clipped(allen(town.facing), x - 1, y - 2, 14, VIEW);
             }
         };
         let mut props = town.landscape.props.iter().peekable();
@@ -121,26 +122,30 @@ impl Frame {
             while let Some(prop) = props.peek().filter(|prop| prop.at.1 <= row) {
                 let (x, y) = point(prop.at);
                 if prop.at.1 >= camera.1 - 2 {
+                    let size = prop.size * ZOOM;
+                    let base = if matches!(prop.art, crate::town::Art::Bridge) {
+                        26
+                    } else {
+                        9
+                    };
                     self.art_clipped(
                         art::town_sprite(prop.art as usize),
-                        x + 6 - prop.size / 2,
-                        y + if matches!(prop.art, crate::town::Art::Bridge) {
-                            26
-                        } else {
-                            9
-                        } - prop.size,
-                        prop.size as usize,
-                        VIEW,
+                        x + TILE_SIZE / 2 - size / 2,
+                        y + base * ZOOM - size,
+                        size as usize,
+                        view.clip,
                     );
                 }
                 props.next();
             }
             if (camera.1..camera.1 + ROWS).contains(&row) {
-                player_and_npcs(self, row);
+                draw_npcs(self, row);
             }
         }
         let (x, y) = point((plan.entry.0 + 2, plan.entry.1 - 2));
-        if (LEFT + 2..VIEW[2] - 12).contains(&x) && (TOP + 7..VIEW[3] - 8).contains(&y) {
+        if (view.left + 2..view.clip[2] - 12).contains(&x)
+            && (TOP + 7..view.clip[3] - 8).contains(&y)
+        {
             self.rect(x + 4, y + 1, 3, 11, 0x44322e);
             self.rect(x + 5, y + 1, 1, 11, 0xa27c55);
             self.rect(x - 2, y - 3, 14, 7, 0x382b2a);
@@ -148,6 +153,7 @@ impl Frame {
             self.rect(x + 1, y, 8, 1, GOLD);
         }
 
+        self.draw_explorer(allen(town.facing), view, town.pos);
         let destination = town.guide_destination(states);
         let remaining = if let (Panel::Explore, Some(place)) = (town.panel, destination) {
             self.draw_guide(
@@ -163,24 +169,27 @@ impl Frame {
                 },
                 |at| town.landscape.walkable(at),
                 |at| town.landscape.surface(at).road(),
-                |at| {
-                    let (x, y) = point(at);
-                    (x + 6, y + 8)
-                },
-                VIEW,
+                |at| view.feet(at),
+                view.clip,
             )
         } else {
             None
         };
 
-        self.label(16, 6, 12, GOLD, plan.name);
-        self.label(204, 8, 9, MIST, "J 手記　M 島へ");
+        self.label(view.left, 6, 12, GOLD, plan.name);
+        self.label(view.clip[2] - 100, 8, 9, MIST, "J 手記　M 島へ");
         let completed = states
             .iter()
             .filter(|state| matches!(state, State::Done(_)))
             .count();
-        self.panel(15, 191, 290, 46);
-        self.label(248, 224, 9, MINT, format!("解決 {completed}/5"));
+        self.panel(view.left - 1, 191, view.width() + 2, 46);
+        self.label(
+            view.clip[2] - 56,
+            224,
+            9,
+            MINT,
+            format!("解決 {completed}/5"),
+        );
 
         match town.panel {
             Panel::Explore => {

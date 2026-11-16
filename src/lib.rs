@@ -11,7 +11,7 @@ mod world_map;
 mod web {
     use crate::{
         game::Game,
-        render::{Frame, BUFFER_HEIGHT, BUFFER_WIDTH},
+        render::{Frame, BUFFER_HEIGHT},
     };
     use std::cell::RefCell;
 
@@ -31,7 +31,7 @@ mod web {
             let mut session = session.borrow_mut();
             let (game, frame) = &mut *session;
             frame.draw(game);
-            unsafe { bitmap(frame.pixels.as_ptr(), BUFFER_WIDTH, BUFFER_HEIGHT) };
+            unsafe { bitmap(frame.pixels.as_ptr(), frame.buffer_width(), BUFFER_HEIGHT) };
             for label in &frame.labels {
                 unsafe {
                     text(
@@ -46,6 +46,14 @@ mod web {
                 }
             }
         });
+    }
+
+    #[no_mangle]
+    extern "C" fn set_view_width(width: usize) {
+        let changed = SESSION.with(|session| session.borrow_mut().1.set_exploration_width(width));
+        if changed {
+            draw();
+        }
     }
 
     #[no_mangle]
