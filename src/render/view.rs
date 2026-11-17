@@ -16,9 +16,13 @@ pub(super) struct View {
 }
 
 impl View {
-    pub(super) fn new(width: i32, (x, y): (i32, i32), (w, h): (i32, i32)) -> Self {
+    pub(super) fn horizontal_bounds(width: i32) -> (i32, i32) {
         let columns = (width - 8) / TILE_SIZE;
-        let left = (width - columns * TILE_SIZE) / 2;
+        ((width - columns * TILE_SIZE) / 2, columns)
+    }
+
+    pub(super) fn new(width: i32, (x, y): (i32, i32), (w, h): (i32, i32)) -> Self {
+        let (left, columns) = Self::horizontal_bounds(width);
         let camera_x = if w < columns {
             (w - columns).div_euclid(2)
         } else {

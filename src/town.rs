@@ -10,7 +10,7 @@ mod vulcan;
 
 use crate::{
     campaign::ChapterBeat,
-    dialogue::{Delivery, Expression, Speaker},
+    dialogue::{Delivery, Expression, Message, Speaker},
     economy::Service,
     walk::Walk,
     world_map::Region,
@@ -146,6 +146,10 @@ pub(crate) enum State {
 }
 
 impl Story {
+    pub(crate) fn script(&self) -> impl Iterator<Item = (usize, Message)> + '_ {
+        self.beats.iter().map(|beat| (beat.place, Message::line(beat.text, beat.delivery)))
+    }
+
     pub(crate) fn beat_count(&self) -> usize {
         self.beats.len()
     }

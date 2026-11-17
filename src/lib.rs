@@ -8,6 +8,7 @@ pub mod game;
 mod intro;
 mod island;
 mod noise;
+mod party_talk;
 mod path;
 pub mod render;
 mod town;
@@ -129,7 +130,13 @@ mod web {
                 || session.0.map_open
                 || session.0.can_open_map()
                 || session.0.debug_back_control()
+                || session.0.party_talk.current().is_some()
         })
+    }
+
+    #[no_mangle]
+    extern "C" fn reviewing_dialogue() -> bool {
+        SESSION.with(|session| session.borrow().0.debug_menu.reader.is_some())
     }
 
     #[no_mangle]
@@ -137,7 +144,9 @@ mod web {
         SESSION.with(|session| {
             let session = session.borrow();
             let game = &session.0;
-            if game.map_open {
+            if game.party_talk.current().is_some() {
+                true
+            } else if game.map_open {
                 game.world_map.campaign.panel.is_some_and(|panel| !matches!(panel, crate::campaign::VoyagePanel::Consent(_))) || game.world_map.fort.as_ref().is_some_and(|fort| {
                     !matches!(fort.panel, crate::fort::Panel::Walk | crate::fort::Panel::Lamps(_) | crate::fort::Panel::Return(_))
                 }) || game.world_map.town.as_ref().is_some_and(|town| {
@@ -165,6 +174,7 @@ mod web {
             session.0.economy_menu.is_some()
                 || session.0.debug_back_control()
                 || session.0.confirm_overwrite
+                || session.0.party_talk.current().is_some()
         })
     }
 

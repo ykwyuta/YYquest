@@ -18,6 +18,8 @@ struct Save {
     position: Position,
     facing: Facing,
     companion: Option<(Position, Facing)>,
+    #[serde(default)]
+    party_conversations: u16,
     hp: u8,
     memories: usize,
     ending: bool,
@@ -86,6 +88,7 @@ impl Game {
             companion: self
                 .companion_position
                 .map(|at| (at, self.companion_facing)),
+            party_conversations: self.party_talk.seen,
             hp: self.hp,
             memories: self.memories,
             ending: matches!(self.scene, Scene::Ending),
@@ -192,6 +195,7 @@ impl Save {
             Scene::Field
         };
         game.intro = self.intro;
+        game.party_talk.seen = self.party_conversations;
         (game.x, game.y) = self.position;
         game.facing = self.facing;
         if let Some((at, facing)) = self.companion {

@@ -103,6 +103,21 @@ pub(crate) struct Message {
 }
 
 impl Message {
+    pub(crate) const fn line(text: &'static str, delivery: Delivery) -> Self {
+        Self {
+            lines: [text, ""],
+            delivery,
+        }
+    }
+
+    pub(crate) fn text(&self) -> &[&'static str] {
+        if self.lines[1].is_empty() {
+            &self.lines[..1]
+        } else {
+            &self.lines
+        }
+    }
+
     pub(crate) const fn narration(lines: [&'static str; 2]) -> Self {
         Self {
             lines,

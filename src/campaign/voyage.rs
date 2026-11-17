@@ -1,5 +1,5 @@
 use super::Region::{self, Celestia, Liberta, Sylva, Vulcan};
-use crate::dialogue::Delivery;
+use crate::dialogue::{Delivery, Message};
 
 #[derive(Clone, Copy)]
 pub(crate) enum VoyagePanel {
@@ -44,7 +44,23 @@ impl VoyageBeat {
     }
 }
 
-pub(super) const STEPS: [VoyageBeat; 12] = [
+pub(crate) const CONSENT_OPTIONS: [&str; 2] = [
+    "家族だけに宛てた封書を作る",
+    "名を伏せたまま証言を預かる",
+];
+
+pub(crate) const CONSENT_RESPONSES: [Message; 2] = [
+    Message::narration([
+        "ミナは家族にだけ見せる封書を預かった。公の写しからは名を除いた。",
+        "カインは、次の手がかりを求めてリベルタの潮待ちの港町へ向かうよう勧めた。",
+    ]),
+    Message::narration([
+        "ミナは名を伏せた証言だけを写し、本人に控えを返した。",
+        "カインは、次の手がかりを求めてリベルタの潮待ちの港町へ向かうよう勧めた。",
+    ]),
+];
+
+pub(crate) const STEPS: [VoyageBeat; 12] = [
     VoyageBeat { region: Celestia, site: 0, title: "第二章　名前を預ける国", speaker: "カイン",
         text: "ノクスの「三つの灯」の写しか。私は元審問官のカインだ。聖堂は昔の記録を『戦の記録』という名目で書庫に隠しているが、中身は避難民たちの証言だ。巡礼神官のミナが聖堂の前で待っている。", event: Event::Read },
     VoyageBeat { region: Celestia, site: 1, title: "聖堂の写本", speaker: "ミナ",
