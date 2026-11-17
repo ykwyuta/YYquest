@@ -1,5 +1,8 @@
 use crate::{game::Key, island::Island, town, world_map::Region};
 
+mod dialogue;
+pub(crate) use dialogue::Reader;
+
 pub(crate) const TITLE_CODE: [u32; 8] = [38, 38, 40, 40, 37, 39, 37, 39];
 
 pub(crate) const PROLOGUE: [&str; 8] = [
@@ -23,6 +26,10 @@ enum Page {
     Stories(usize),
     Beats(usize, usize),
     Prologue,
+    Dialogue,
+    DialogueRegions,
+    DialogueTowns(Region),
+    DialogueStories(Region, usize),
 }
 
 pub(crate) enum Target {
@@ -42,6 +49,7 @@ pub(crate) struct Menu {
     page: Page,
     pub(crate) selected: usize,
     pub(crate) previewing: bool,
+    pub(crate) reader: Option<Reader>,
 }
 
 impl Menu {
@@ -54,13 +62,22 @@ impl Menu {
             Page::Stories(town) => town::plan(Region::Nox, town).name,
             Page::Beats(town, story) => town::plan(Region::Nox, town).stories[story].title,
             Page::Prologue => "序章のイベント",
+            Page::Dialogue => "会話を通読",
+            Page::DialogueRegions => "会話を読む島を選ぶ",
+            Page::DialogueTowns(region) => region.caption().0,
+            Page::DialogueStories(region, town) => town::plan(region, town).name,
         }
     }
 
     pub(crate) fn entries(&self) -> Vec<String> {
         let names: Vec<&str> = match self.page {
-            Page::Root => vec!["町・村・廃墟", "ノクスのサイドストーリー", "序章のイベント"],
-            Page::Islands => Region::ALL
+            Page::Root => vec![
+                "町・村・廃墟",
+                "ノクスのサイドストーリー",
+                "序章のイベント",
+                "会話を通読",
+            ],
+            Page::Islands | Page::DialogueRegions => Region::ALL
                 .iter()
                 .map(|region| region.caption().0)
                 .collect(),
@@ -94,11 +111,34 @@ impl Menu {
                     .collect();
             }
             Page::Prologue => PROLOGUE.to_vec(),
+            Page::Dialogue => vec![
+                "同行中の会話",
+                "序章の会話",
+                "本編の会話",
+                "街のサイドストーリー",
+            ],
+            Page::DialogueTowns(region) => (0..town::COUNT)
+                .map(|index| town::plan(region, index).name)
+                .collect(),
+            Page::DialogueStories(region, town) => std::iter::once("この街の会話を通読")
+                .chain(
+                    town::plan(region, town)
+                        .stories
+                        .iter()
+                        .map(|story| story.title),
+                )
+                .collect(),
         };
         names.into_iter().map(str::to_owned).collect()
     }
 
     pub(crate) fn input(&mut self, key: Key) -> Action {
+        if let Some(reader) = &mut self.reader {
+            if reader.input(key) {
+                self.reader = None;
+            }
+            return Action::Stay;
+        }
         let row = self.selected;
         let next = match key {
             Key::Up => {
@@ -115,8 +155,14 @@ impl Menu {
                 Page::Islands => (Page::Root, 0),
                 Page::StoryTowns => (Page::Root, 1),
                 Page::Prologue => (Page::Root, 2),
-                Page::Sites(region) => (
-                    Page::Islands,
+                Page::Dialogue => (Page::Root, 3),
+                Page::DialogueRegions => (Page::Dialogue, 3),
+                Page::Sites(region) | Page::DialogueTowns(region) => (
+                    if matches!(self.page, Page::Sites(_)) {
+                        Page::Islands
+                    } else {
+                        Page::DialogueRegions
+                    },
                     Region::ALL
                         .iter()
                         .position(|&candidate| candidate == region)
@@ -124,10 +170,16 @@ impl Menu {
                 ),
                 Page::Stories(index) => (Page::StoryTowns, index),
                 Page::Beats(index, story) => (Page::Stories(index), story),
+                Page::DialogueStories(region, town) => (Page::DialogueTowns(region), town),
             },
             Key::Confirm => {
                 let page = match self.page {
-                    Page::Root => [Page::Islands, Page::StoryTowns, Page::Prologue][row],
+                    Page::Root => [
+                        Page::Islands,
+                        Page::StoryTowns,
+                        Page::Prologue,
+                        Page::Dialogue,
+                    ][row],
                     Page::Islands => Page::Sites(Region::ALL[row]),
                     Page::Sites(region) => return Action::Jump(Target::Site(region, row)),
                     Page::StoryTowns => Page::Stories(row),
@@ -136,6 +188,18 @@ impl Menu {
                         return Action::Jump(Target::Story(index, story, row))
                     }
                     Page::Prologue => return Action::Jump(Target::Prologue(row)),
+                    Page::Dialogue if row == 3 => Page::DialogueRegions,
+                    Page::Dialogue => {
+                        self.reader =
+                            Some([Reader::party, Reader::prologue, Reader::campaign][row]());
+                        return Action::Stay;
+                    }
+                    Page::DialogueRegions => Page::DialogueTowns(Region::ALL[row]),
+                    Page::DialogueTowns(region) => Page::DialogueStories(region, row),
+                    Page::DialogueStories(region, town) => {
+                        self.reader = Some(Reader::town(region, town, row.checked_sub(1)));
+                        return Action::Stay;
+                    }
                 };
                 (page, 0)
             }

@@ -1,16 +1,20 @@
 use crate::{
     campaign::VoyagePanel,
     debug::{self, Target},
-    dialogue::{Expression, Message, Speaker},
+    dialogue::Message,
     economy::{Goods, Menu, OptionRow, Page},
     fort,
-    intro::{After, Intro, Lesson, HEARTH, MEETING, MEMORIAL, SLUICE},
+    intro::{script, After, Intro, Lesson, HEARTH, MEETING, MEMORIAL, SLUICE},
+    party_talk::{Event as PartyEvent, PartyTalk},
     path::Distances,
     walk::{Walk, STEP_MS},
     world_map::{Region, WorldMap},
 };
 
 mod save;
+
+#[cfg(test)]
+use crate::dialogue::Speaker;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Key {
@@ -239,6 +243,7 @@ pub struct Game {
     pub(crate) map_open: bool,
     pub(crate) world_map: WorldMap,
     pub(crate) debug_menu: debug::Menu,
+    pub(crate) party_talk: PartyTalk,
     title_code: usize,
     pub(crate) intro: Intro,
     after: After,
@@ -277,6 +282,7 @@ impl Game {
             map_open: false,
             world_map: WorldMap::new(),
             debug_menu: debug::Menu::default(),
+            party_talk: PartyTalk::default(),
             title_code: 0,
             intro: Intro::Hearth,
             after: After::None,
@@ -326,11 +332,17 @@ impl Game {
         } else {
             false
         };
-        animated | self.advance_held_direction(milliseconds)
+        let stepped = self.advance_held_direction(milliseconds);
+        let talking = self.held_direction.is_none()
+            && self.can_repeat_walk()
+            && self
+                .party_event()
+                .is_some_and(|event| self.party_talk.pause(event, milliseconds));
+        animated | stepped | talking
     }
 
     fn can_repeat_walk(&self) -> bool {
-        if self.economy_menu.is_some() {
+        if self.economy_menu.is_some() || self.party_talk.current().is_some() {
             return false;
         }
         if self.map_open {
@@ -348,6 +360,27 @@ impl Game {
                     .is_none_or(|town| matches!(town.panel, crate::town::Panel::Explore))
         } else {
             matches!(self.scene, Scene::Field) && self.message.is_none() && !self.journal
+        }
+    }
+
+    fn party_event(&self) -> Option<PartyEvent> {
+        if !self.lilith || self.debug_menu.previewing {
+            return None;
+        }
+        if self.map_open {
+            if self.world_map.fort.is_some() {
+                return None;
+            }
+            let region = self.world_map.island.as_ref()?.region;
+            Some(PartyEvent::on_island(region, self.world_map.town.is_some()))
+        } else {
+            (self.intro == Intro::Return).then_some(PartyEvent::Homeward)
+        }
+    }
+
+    fn party_step(&mut self) {
+        if let Some(event) = self.party_event() {
+            self.party_talk.walked(event);
         }
     }
 
@@ -479,6 +512,14 @@ impl Game {
     }
 
     fn handle_input(&mut self, key: Key) {
+        if self.party_talk.current().is_some() {
+            match key {
+                Key::Confirm => self.party_talk.advance(false),
+                Key::Back | Key::Map => self.party_talk.advance(true),
+                _ => {}
+            }
+            return;
+        }
         if self.economy_menu.is_some() {
             self.economy_input(key);
             return;
@@ -519,6 +560,7 @@ impl Game {
                     .is_some_and(|town| town.pos != position)
                 {
                     self.goods.walked();
+                    self.party_step();
                 }
                 for (old, new) in previous
                     .into_iter()
@@ -595,6 +637,7 @@ impl Game {
                     .is_some_and(|island| Some((island.x, island.y)) != position)
                 {
                     self.goods.walked();
+                    self.party_step();
                 }
             }
             return;
@@ -676,10 +719,7 @@ impl Game {
 
     fn start_prologue(&mut self) {
         self.scene = Scene::Field;
-        self.message = Some(Message::narration([
-            "東の森から水が止まり、炉のそばを緑の精霊が舞い始めた。",
-            "案内精霊トモルに導かれ、アレンは「炉番」のもとへ向かう。",
-        ]));
+        self.message = Some(script::OPENING);
     }
 
     fn return_to_debug(&mut self) {
@@ -789,10 +829,7 @@ impl Game {
             if route.get(next) >= route.get(current) {
                 self.clear_held_direction();
                 self.after = After::None;
-                self.message = Some(Message::guide([
-                    "案内精霊トモルが、三つの光の雫で安全な道を照らしている。",
-                    "光のあとをたどって、目的地へ向かおう。",
-                ]));
+                self.message = Some(script::GUIDE);
                 return;
             }
         }
@@ -808,18 +845,14 @@ impl Game {
             self.companion_position = Some(current);
         }
         (self.x, self.y) = next;
+        self.party_step();
     }
 
     fn inspect_intro(&mut self) {
-        use Expression::*;
-        use Speaker::*;
         if (self.x, self.y) != self.intro.destination().0 {
             if (self.x, self.y) == HEARTH {
                 self.hp = MAX_HP;
-                self.message = Some(Message::narration([
-                    "炉のそばで休むと、手足の冷えが引いた。",
-                    "アレンの体力が回復した。",
-                ]));
+                self.message = Some(script::REST);
             }
             return;
         }
@@ -827,66 +860,28 @@ impl Game {
             Intro::Hearth => {
                 self.hp = MAX_HP;
                 self.after = After::HearthTask;
-                Message::spoken(
-                    Hearth,
-                    Thoughtful,
-                    [
-                        "『トモル』が目覚めたのかい。父さんの剣のそばで眠っていた灯の精霊さ。",
-                        "助けを呼ぶ声や灯の記憶に共鳴して、安全な道を光で示してくれるんだよ。",
-                    ],
-                )
+                script::HEARTH_LORE
             }
             Intro::Meeting => {
                 self.after = After::Continue(Intro::Sluice);
-                Message::spoken(
-                    Lilith,
-                    Speaking,
-                    [
-                        "村の人？　さっき笛を吹いたの、私。リリスっていうの。",
-                        "水門が引っかかって開かないの。剣で持ち上げるのを手伝ってくれない？",
-                    ],
-                )
+                script::MEETING
             }
             Intro::Sluice => {
                 self.after = After::Fight(Lesson::Sluice);
-                Message::narration([
-                    "アレンが父の剣を留め具に差し込むと、重い水門が持ち上がった。",
-                    "リリスが門を支えたその瞬間、水路の奥から魔物が飛び出した！",
-                ])
+                script::SLUICE
             }
             Intro::Memorial => {
                 self.after = After::Fight(Lesson::Memorial);
-                Message::spoken(
-                    Lilith,
-                    Resolute,
-                    [
-                        "石碑が濃い霧に覆われて、さっきの音をかき消しているみたい。",
-                        "私が精霊の力で霧を払うから、少しの間だけ魔物を引き受けて！",
-                    ],
-                )
+                script::MEMORIAL
             }
             Intro::Choice => return,
             Intro::Nox => {
                 self.hp = MAX_HP;
-                Message::spoken(
-                    Hearth,
-                    Relieved,
-                    [
-                        "水はもう来てるよ。火のそばにおいで。",
-                        "顔色がよくなったね。出る前に、もう少し温まっていきな。",
-                    ],
-                )
+                script::HEARTH_REVISIT
             }
             Intro::Return => {
                 self.after = After::BeginNox;
-                Message::spoken(
-                    Hearth,
-                    Smile,
-                    [
-                        "村に水が戻ったよ。二人とも、本当に助かった！",
-                        "そうだ、お父さんの帰還記録なら、村の旧宅にしまってあるよ。",
-                    ],
-                )
+                script::HEARTH_REPORT
             }
         });
     }
@@ -896,48 +891,24 @@ impl Game {
         match std::mem::take(&mut self.after) {
             After::None => {}
             After::HearthTask => {
-                self.message = Some(Message::spoken(
-                    Speaker::Hearth,
-                    Expression::Worried,
-                    [
-                        "森の水路が止まったうえ、東の森から笛の音が聞こえたよ。",
-                        "古い水門は父さんの剣で開けられる。トモルと見てきておくれ。",
-                    ],
-                ));
+                self.message = Some(script::HEARTH_TASK);
                 self.after = After::Continue(Intro::Meeting);
             }
             After::Continue(next) => self.intro = next,
             After::Fight(lesson) => self.start_lesson(lesson),
             After::Ask => {
-                self.message = Some(Message::spoken(
-                    Speaker::Allen,
-                    Expression::Thoughtful,
-                    [
-                        "今の声……父さんは救助船を見送って、あの日、砦に残ったのか？",
-                        "父さんの家に記録があるはずだ。リリスも一緒に来てくれないか？",
-                    ],
-                ));
+                self.message = Some(script::ASK);
                 self.after = After::Reply;
             }
             After::Reply => {
-                self.message = Some(Message::spoken(
-                    Speaker::Lilith,
-                    Expression::Resolute,
-                    [
-                        "うん、私も行く。自分の名前以外の記憶がなくて……",
-                        "なぜ石碑から私を呼ぶ声が聞こえたのか、確かめたいの。",
-                    ],
-                ));
+                self.message = Some(script::REPLY);
                 self.after = After::Recruit;
             }
             After::Recruit => {
                 self.lilith = true;
                 self.companion_position = Some(self.intro.waiting_lilith());
                 self.intro = Intro::Return;
-                self.message = Some(Message::narration([
-                    "二人はガウェインの記録を探すことにした。",
-                    "リリスが仲間になった。",
-                ]));
+                self.message = Some(script::RECRUIT);
             }
             After::BeginNox => {
                 self.intro = Intro::Nox;
@@ -962,38 +933,18 @@ impl Game {
         if self.hp == 0 {
             self.hp = MAX_HP;
             self.memories = memories;
-            self.message = Some(Message::spoken(
-                Speaker::Lilith,
-                Expression::Worried,
-                [
-                    "よかった、気がついたんだね。急いで霧の外まで運んだよ。",
-                    "無理しないで。もう一度挑むなら、今度は私もそばにいるから。",
-                ],
-            ));
+            self.message = Some(script::RESCUE);
             return;
         }
         self.message = Some(match lesson {
             Lesson::Sluice => {
                 self.after = After::Continue(Intro::Memorial);
-                Message::spoken(
-                    Speaker::Lilith,
-                    Expression::Relieved,
-                    [
-                        "水路が通ったね！　……あれ、今アレンの剣とトモルが共鳴しなかった？",
-                        "北の石碑からも同じ音が返ってくる。先に様子を見てくるね！",
-                    ],
-                )
+                script::WATER_RESTORED
             }
             Lesson::Memorial => {
                 self.intro = Intro::Choice;
                 self.after = After::Ask;
-                Message::record(
-                    "石碑から響く過去の声",
-                    [
-                        "『ガウェイン、砦の三つの灯が見えた。救助船をそっちへ向かわせる』",
-                        "『リリス、船が着くまで砦の灯を絶やすな』",
-                    ],
-                )
+                script::MEMORIAL_RECORD
             }
         });
     }

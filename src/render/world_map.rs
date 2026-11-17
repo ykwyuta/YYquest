@@ -1,7 +1,6 @@
 use super::{Frame, GOLD, INK, IVORY, LINE, MINT, MIST};
 use crate::{
-    campaign::{VoyageBeat, VoyagePanel},
-    dialogue::Delivery,
+    campaign::{VoyageBeat, VoyagePanel, CONSENT_OPTIONS, CONSENT_RESPONSES},
     economy::Goods,
     island::Island,
     world_map::{Region, WorldMap, MAP},
@@ -125,10 +124,7 @@ impl Frame {
                 }
             }
             VoyagePanel::Consent(selected) => {
-                for (index, choice) in ["家族だけに宛てた封書を作る", "名を伏せたまま証言を預かる"]
-                    .into_iter()
-                    .enumerate()
-                {
+                for (index, choice) in CONSENT_OPTIONS.into_iter().enumerate() {
                     let marker = if index == selected { "▶" } else { "　" };
                     self.label(
                         x + 10,
@@ -140,20 +136,8 @@ impl Frame {
                 }
             }
             VoyagePanel::Response(sealed) => {
-                let response = if sealed {
-                    "ミナは家族にだけ見せる封書を預かった。公の写しからは名を除いた。"
-                } else {
-                    "ミナは名を伏せた証言だけを写し、本人に控えを返した。"
-                };
-                self.dialogue_content(
-                    (x + 10, 59),
-                    width - 20,
-                    &[
-                        response,
-                        "カインは、次の手がかりを求めてリベルタの潮待ちの港町へ向かうよう勧めた。",
-                    ],
-                    Delivery::Scene,
-                );
+                let response = CONSENT_RESPONSES[usize::from(!sealed)];
+                self.dialogue_content((x + 10, 59), width - 20, response.text(), response.delivery);
             }
         }
         let action = if beat.battle() {

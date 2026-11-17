@@ -89,12 +89,13 @@ function playSound() {
 }
 
 function applyControlLayout() {
-  const layout = preferredLayout ?? (desktopControls.matches ? "outside" : "overlay");
+  const preference = preferredLayout ?? (desktopControls.matches ? "outside" : "overlay");
+  const layout = preference === "overlay" && stage.dataset.reviewing === "true" ? "outside" : preference;
   if (stage.dataset.controls !== layout) {
     for (const pointerId of touchDirections.keys()) releasePointerDirection(pointerId);
     stage.dataset.controls = layout;
   }
-  touchLayout.value = layout;
+  touchLayout.value = preference;
   resizeViewport();
 }
 
@@ -327,12 +328,17 @@ function clearHeldDirections() {
 
 function updateControls() {
   stage.dataset.reading = Boolean(wasm.reading_dialogue?.());
+  const wasReviewing = stage.dataset.reviewing === "true";
+  const reviewing = Boolean(wasm.reviewing_dialogue?.());
+  stage.dataset.reviewing = reviewing;
+  touchLayout.hidden = reviewing;
   const refreshWasHidden = refreshButton.hidden;
   refreshButton.hidden = !wasm.is_title();
   mapButton.textContent = wasm.debug_back_control() ? "戻る" : "地図";
   mapButton.hidden = !wasm.has_map_control();
   if (refreshButton.hidden && !saveFailed) status.hidden = true;
-  if (refreshButton.hidden !== refreshWasHidden) resizeViewport();
+  if (reviewing !== wasReviewing) applyControlLayout();
+  else if (refreshButton.hidden !== refreshWasHidden) resizeViewport();
 }
 
 try {

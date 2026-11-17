@@ -1,3 +1,4 @@
+use crate::dialogue::Message;
 use crate::game::{Enemy, Facing, Game, Scene, Tactic, COMMANDS, MAX_HP, MEMORIES};
 use crate::walk::Pose;
 
@@ -221,7 +222,17 @@ impl Frame {
         self.pixels.fill(NIGHT);
         self.labels.clear();
         if game.map_open {
-            self.draw_world_map(&game.world_map, &game.goods, game.economy_menu.is_none());
+            let party = game.party_talk.current();
+            self.draw_world_map(
+                &game.world_map,
+                &game.goods,
+                game.economy_menu.is_none() && party.is_none(),
+            );
+            if let Some(message) = party {
+                self.labels.retain(|label| label.y < 143);
+                let (left, columns) = view::View::horizontal_bounds(self.width as i32);
+                self.exploration_message(left, columns * view::TILE_SIZE, message);
+            }
             if let Some(menu) = &game.economy_menu {
                 self.draw_economy(menu, &game.goods, game.goods.hp);
             }
@@ -310,6 +321,7 @@ impl Frame {
         let map_size = crate::game::PROLOGUE_SIZE;
         let player = (game.x, game.y);
         let view = view::View::following(self.width as i32, player, map_size, &game.walk);
+        let message = game.message.or_else(|| game.party_talk.current());
         self.label(view.left, 7, 12, GOLD, "黄昏の辺境領ノクス");
         self.label(
             view.clip[2] - 82,
@@ -346,7 +358,7 @@ impl Frame {
             player,
             &game.walk,
         );
-        if game.message.is_none() && !game.journal && game.intro != crate::intro::Intro::Nox {
+        if message.is_none() && !game.journal && game.intro != crate::intro::Intro::Nox {
             let target = game.intro.destination().0;
             self.draw_guide(
                 guide::Guidance {
@@ -361,23 +373,11 @@ impl Frame {
                 view.clip,
             );
         }
-        if game.message.is_none() && !game.journal && game.economy_menu.is_none() {
+        if message.is_none() && !game.journal && game.economy_menu.is_none() {
             self.draw_prologue_minimap(view, game);
         }
-        if let Some(message) = game.message {
-            let top = if message.delivery.is_speech() {
-                143
-            } else {
-                159
-            };
-            self.panel(view.left - 1, top, view.width() + 2, 237 - top);
-            self.dialogue_content(
-                (view.left + 9, top + 8),
-                view.width() - 18,
-                &message.lines,
-                message.delivery,
-            );
-            self.label(view.clip[0] + 12, 225, 9, GOLD, "▼ 決定");
+        if let Some(message) = message {
+            self.exploration_message(view.left, view.width(), message);
         } else {
             self.panel(view.left - 1, 191, view.width() + 2, 46);
             self.label(24, 196, 11, IVORY, game.intro.destination().1);
@@ -403,6 +403,22 @@ impl Frame {
             }
             self.label(200, 151, 9, MINT, "J / Esc  閉じる");
         }
+    }
+
+    fn exploration_message(&mut self, left: i32, width: i32, message: Message) {
+        let top = if message.delivery.is_speech() {
+            143
+        } else {
+            159
+        };
+        self.panel(left - 1, top, width + 2, 237 - top);
+        self.dialogue_content(
+            (left + 9, top + 8),
+            width - 18,
+            message.text(),
+            message.delivery,
+        );
+        self.label(left + 12, 225, 9, GOLD, "▼ 決定");
     }
 
     fn battle(&mut self, game: &Game) {

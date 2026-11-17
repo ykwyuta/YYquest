@@ -2,7 +2,7 @@ use crate::dialogue::{Delivery, Expression::*, Speaker::*};
 use crate::world_map::Region;
 
 mod voyage;
-pub(crate) use voyage::{VoyageBeat, VoyagePanel};
+pub(crate) use voyage::{VoyageBeat, VoyagePanel, CONSENT_OPTIONS, CONSENT_RESPONSES, STEPS as VOYAGE};
 
 #[derive(Clone, Copy)]
 pub(crate) struct ChapterBeat {
@@ -13,7 +13,7 @@ pub(crate) struct ChapterBeat {
     pub delivery: Delivery,
 }
 
-const CHAPTER: [ChapterBeat; 6] = [
+pub(crate) const CHAPTER: [ChapterBeat; 6] = [
     ChapterBeat {
         site: 0, place: Some(1), title: "途切れた帰還記録",
         text: "これがお父さんの残した帰還記録だよ。同じ船が二度戻ったとあるのに、二度目の人数だけが削り消されている。欄外に「三つの灯」という印があるね……霧灯の港町の信号台で、灯台守に意味を聞いてごらん。",

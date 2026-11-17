@@ -1,5 +1,7 @@
 use crate::island::Position;
 
+pub(crate) mod script;
+
 pub(crate) const HEARTH: Position = (3, 2);
 pub(crate) const MEETING: Position = (13, 6);
 pub(crate) const SLUICE: Position = (10, 7);
