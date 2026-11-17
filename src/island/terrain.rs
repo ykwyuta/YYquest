@@ -14,13 +14,8 @@ pub(super) fn expand(layout: &Layout, region: Region) -> Vec<Tile> {
         }
     }
 
-    for (row, cells) in layout.rows.iter().enumerate() {
-        for (col, cell) in cells.iter().enumerate() {
-            if cell.is_ascii_digit() {
-                let (x, y) = scale_door((col as i32 * 2 + 1, row as i32 * 2 + 1));
-                tiles[address(x, y)] = Tile::Landmark((cell - b'0') as usize);
-            }
-        }
+    for ((x, y), index) in layout.scenic_sites() {
+        tiles[address(x, y)] = Tile::Landmark(index);
     }
     tiles
 }

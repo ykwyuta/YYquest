@@ -2,6 +2,7 @@ use super::{
     allen,
     guide::{Area, Guidance},
     map_art::{self as art, Ground},
+    minimap::{Ground as MapGround, Landmark, Minimap},
     view::{View, ROWS, TILE_SIZE, TOP, ZOOM},
     Frame, GOLD, INK, IVORY, LINE, MINT, MIST,
 };
@@ -16,6 +17,7 @@ impl Frame {
         island: &Island,
         guide_site: Option<usize>,
         event_action: Option<&str>,
+        show_minimap: bool,
     ) {
         let player = (island.x, island.y);
         let view = View::following(self.width as i32, player, (WIDTH, HEIGHT), &island.walk);
@@ -100,6 +102,36 @@ impl Frame {
                 view.clip,
             )
         });
+        if show_minimap {
+            self.draw_minimap(
+                view,
+                Minimap {
+                    area: Area::Island(island.region),
+                    size: (WIDTH, HEIGHT),
+                    player,
+                    target: destination.map(|site| site.door),
+                },
+                |(x, y)| match island.tile(x, y) {
+                    Tile::Sea | Tile::Water => MapGround::Water,
+                    Tile::Road | Tile::Bridge | Tile::Plaza => MapGround::Road,
+                    Tile::Forest | Tile::Grove | Tile::Mire => MapGround::Woods,
+                    Tile::Ash | Tile::Cliff | Tile::Ruin => MapGround::Rock,
+                    Tile::Beach => MapGround::Sand,
+                    Tile::Lava => MapGround::Lava,
+                    _ => MapGround::Meadow,
+                },
+                island.scenic_sites().map(|at| (at, Landmark::Place)).chain(
+                    island.settlements().iter().map(|settlement| {
+                        let kind = if settlement.landmark.kind == Kind::Harbor {
+                            Landmark::Exit
+                        } else {
+                            Landmark::Place
+                        };
+                        (settlement.door, kind)
+                    }),
+                ),
+            );
+        }
 
         self.panel(view.left - 1, 191, view.width() + 2, 46);
         let site = island.current_landmark();

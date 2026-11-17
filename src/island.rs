@@ -89,6 +89,19 @@ struct Layout {
     settlements: [Settlement; SETTLEMENTS],
 }
 
+impl Layout {
+    fn scenic_sites(&self) -> impl Iterator<Item = (Position, usize)> + '_ {
+        self.rows.iter().enumerate().flat_map(|(row, cells)| {
+            cells.iter().enumerate().filter_map(move |(col, &cell)| {
+                cell.is_ascii_digit().then(|| {
+                    let at = terrain::scale_door((col as i32 * 2 + 1, row as i32 * 2 + 1));
+                    (at, (cell - b'0') as usize)
+                })
+            })
+        })
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Tile {
     Sea,
@@ -189,6 +202,10 @@ impl Island {
 
     pub(crate) fn settlements(&self) -> &[Settlement; SETTLEMENTS] {
         &self.settlements
+    }
+
+    pub(crate) fn scenic_sites(&self) -> impl Iterator<Item = Position> + '_ {
+        self.layout.scenic_sites().map(|(at, _)| at)
     }
 
     pub(crate) fn landmark(&self, index: usize) -> &Landmark {

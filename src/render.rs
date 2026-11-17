@@ -7,6 +7,7 @@ mod fort;
 mod guide;
 mod island;
 mod map_art;
+mod minimap;
 mod portrait;
 mod sprite;
 mod town;
@@ -19,7 +20,7 @@ use sprite::Sprite;
 
 pub const WIDTH: usize = 320;
 pub const HEIGHT: usize = 240;
-pub(crate) const DISPLAY_SCALE: usize = 2;
+pub(crate) const DISPLAY_SCALE: usize = 3;
 pub const BUFFER_WIDTH: usize = WIDTH * DISPLAY_SCALE;
 pub const BUFFER_HEIGHT: usize = HEIGHT * DISPLAY_SCALE;
 
@@ -81,8 +82,11 @@ pub struct Frame {
     pub pixels: Vec<u32>,
     pub labels: Vec<Label>,
     guide: Option<guide::Route>,
+    minimap: Option<minimap::Terrain>,
+    minimap_inset: i32,
     width: usize,
     exploration_width: usize,
+    terrain_cache: map_art::TerrainCache,
 }
 
 impl Frame {
@@ -91,8 +95,11 @@ impl Frame {
             pixels: vec![0; BUFFER_WIDTH * BUFFER_HEIGHT],
             labels: Vec::new(),
             guide: None,
+            minimap: None,
+            minimap_inset: 0,
             width: WIDTH,
             exploration_width: WIDTH,
+            terrain_cache: map_art::TerrainCache::new(),
         }
     }
 
@@ -101,10 +108,12 @@ impl Frame {
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub(crate) fn set_exploration_width(&mut self, width: usize) -> bool {
+    pub(crate) fn set_exploration_view(&mut self, width: usize, minimap_inset: usize) -> bool {
         let width = width.clamp(WIDTH, 560);
-        let changed = width != self.exploration_width;
+        let minimap_inset = minimap_inset.min(width / 2) as i32;
+        let changed = width != self.exploration_width || minimap_inset != self.minimap_inset;
         self.exploration_width = width;
+        self.minimap_inset = minimap_inset;
         changed
     }
 
@@ -212,7 +221,7 @@ impl Frame {
         self.pixels.fill(NIGHT);
         self.labels.clear();
         if game.map_open {
-            self.draw_world_map(&game.world_map, &game.goods);
+            self.draw_world_map(&game.world_map, &game.goods, game.economy_menu.is_none());
             if let Some(menu) = &game.economy_menu {
                 self.draw_economy(menu, &game.goods, game.goods.hp);
             }
@@ -351,6 +360,9 @@ impl Frame {
                 |at| view.feet(at),
                 view.clip,
             );
+        }
+        if game.message.is_none() && !game.journal && game.economy_menu.is_none() {
+            self.draw_prologue_minimap(view, game);
         }
         if let Some(message) = game.message {
             let top = if message.delivery.is_speech() {

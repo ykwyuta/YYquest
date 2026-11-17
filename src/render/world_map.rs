@@ -12,9 +12,14 @@ const TOP: i32 = 24;
 const CELL: i32 = 12;
 
 impl Frame {
-    pub(super) fn draw_world_map(&mut self, world: &WorldMap, goods: &Goods) {
+    pub(super) fn draw_world_map(&mut self, world: &WorldMap, goods: &Goods, show_minimap: bool) {
         if let Some(town) = &world.town {
-            self.draw_town(town, &world.region_progress(town.region)[town.index], goods);
+            self.draw_town(
+                town,
+                &world.region_progress(town.region)[town.index],
+                goods,
+                show_minimap,
+            );
             return;
         }
         if let Some(island) = &world.island {
@@ -30,7 +35,12 @@ impl Frame {
             } else {
                 None
             };
-            self.draw_island(island, world.guide_site(island), action);
+            self.draw_island(
+                island,
+                world.guide_site(island),
+                action,
+                show_minimap && world.campaign.panel.is_none(),
+            );
             if let Some(beat) = voyage {
                 self.draw_voyage(beat, world.campaign.panel, world.campaign.sealed_names);
             }

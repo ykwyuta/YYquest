@@ -277,6 +277,73 @@ mod tests {
     }
 }
 
+struct TerrainTile {
+    at: (i32, i32),
+    size: i32,
+    materials: [Ground; 9],
+    pixels: Vec<u32>,
+}
+
+impl TerrainTile {
+    fn new(at: (i32, i32), size: i32, materials: [Ground; 9]) -> Self {
+        let (map_x, map_y) = (at.0 * size, at.1 * size);
+        let center = materials[4];
+        let uniform = materials.iter().all(|&ground| ground == center);
+        let mut pixels = Vec::with_capacity((size * size) as usize);
+        for py in 0..size {
+            for px in 0..size {
+                let (x, y) = (map_x + px, map_y + py);
+                let color = if uniform || center == Ground::Dock {
+                    texture(center, x, y)
+                } else {
+                    let gx = if px < size / 2 { 3 } else { 5 };
+                    let gy = if py < size / 2 { 1 } else { 7 };
+                    let h = (((px * 2 + 1) * 16 / size) - 16).abs();
+                    let v = (((py * 2 + 1) * 16 / size) - 16).abs();
+                    let corners = [
+                        (center, (32 - h) * (32 - v)),
+                        (materials[gx], h * (32 - v)),
+                        (materials[gy], (32 - h) * v),
+                        (materials[gx + gy - 4], h * v),
+                    ];
+                    transition(corners, x, y)
+                };
+                pixels.push(color);
+            }
+        }
+        Self {
+            at,
+            size,
+            materials,
+            pixels,
+        }
+    }
+}
+
+pub(super) struct TerrainCache(Vec<Option<TerrainTile>>);
+
+impl TerrainCache {
+    // This covers the widest visible view plus the partially scrolled tiles.
+    const COLUMNS: i32 = 32;
+    const ROWS: i32 = super::view::ROWS + 1;
+
+    pub(super) fn new() -> Self {
+        Self((0..Self::COLUMNS * Self::ROWS).map(|_| None).collect())
+    }
+
+    fn get(&mut self, at: (i32, i32), size: i32, materials: [Ground; 9]) -> &[u32] {
+        let index = at.1.rem_euclid(Self::ROWS) * Self::COLUMNS + at.0.rem_euclid(Self::COLUMNS);
+        let slot = &mut self.0[index as usize];
+        if !slot
+            .as_ref()
+            .is_some_and(|tile| tile.at == at && tile.size == size && tile.materials == materials)
+        {
+            *slot = Some(TerrainTile::new(at, size, materials));
+        }
+        &slot.as_ref().unwrap().pixels
+    }
+}
+
 impl Frame {
     pub(super) fn terrain(
         &mut self,
@@ -292,30 +359,18 @@ impl Frame {
         );
         let size = size * DISPLAY_SCALE as i32;
         let [left, top, right, bottom] = clip.map(|edge| edge * DISPLAY_SCALE as i32);
-        let (map_x, map_y) = (tile.0 * size, tile.1 * size);
+        let first = (left - sx).max(0);
+        let end = (right - sx).min(size);
+        if first >= end {
+            return;
+        }
         let stride = self.buffer_width();
-        let center = materials[4];
-        let uniform = materials.iter().all(|&ground| ground == center);
+        let pixels = self.terrain_cache.get(tile, size, materials);
         for py in (top - sy).max(0)..(bottom - sy).min(size) {
-            for px in (left - sx).max(0)..(right - sx).min(size) {
-                let (x, y) = (map_x + px, map_y + py);
-                let index = (sy + py) as usize * stride + (sx + px) as usize;
-                self.pixels[index] = if uniform || center == Ground::Dock {
-                    texture(center, x, y)
-                } else {
-                    let gx = if px < size / 2 { 3 } else { 5 };
-                    let gy = if py < size / 2 { 1 } else { 7 };
-                    let h = (((px * 2 + 1) * 16 / size) - 16).abs();
-                    let v = (((py * 2 + 1) * 16 / size) - 16).abs();
-                    let corners = [
-                        (materials[4], (32 - h) * (32 - v)),
-                        (materials[gx], h * (32 - v)),
-                        (materials[gy], (32 - h) * v),
-                        (materials[gx + gy - 4], h * v),
-                    ];
-                    transition(center, corners, x, y)
-                };
-            }
+            let dest = (sy + py) as usize * stride + (sx + first) as usize;
+            let row = py * size;
+            let source = &pixels[(row + first) as usize..(row + end) as usize];
+            self.pixels[dest..dest + source.len()].copy_from_slice(source);
         }
     }
 }
@@ -368,7 +423,7 @@ fn mix(a: u32, b: u32, amount: i32) -> u32 {
     channel(16) | channel(8) | channel(0)
 }
 
-fn transition(center: Ground, colors: [(Ground, i32); 4], x: i32, y: i32) -> u32 {
+fn transition(colors: [(Ground, i32); 4], x: i32, y: i32) -> u32 {
     let water: i32 = colors
         .iter()
         .filter(|(ground, _)| ground.water())
@@ -389,16 +444,17 @@ fn transition(center: Ground, colors: [(Ground, i32); 4], x: i32, y: i32) -> u32
             .0;
         return shore(water, dry, wet, x, y);
     }
-    let mut result = texture(center, x, y);
-    let grain = (natural_noise(x, y, 7 * DISPLAY_SCALE as i32) - 128) / 8;
-    for (other, weight) in colors.into_iter().skip(1) {
-        if weight == 0 || other == center {
-            continue;
+    // Use the same blend from either side of a tile edge.
+    let mut channels = [0; 3];
+    for (ground, weight) in colors {
+        if weight != 0 {
+            let rgb = texture(ground, x, y);
+            for (total, shift) in channels.iter_mut().zip([16, 8, 0]) {
+                *total += (rgb >> shift & 255) * weight as u32;
+            }
         }
-        let amount = ((weight - 100) * 3 / 4 + grain).clamp(0, 224);
-        result = mix(result, texture(other, x, y), amount);
     }
-    result
+    (channels[0] >> 10) << 16 | (channels[1] >> 10) << 8 | (channels[2] >> 10)
 }
 
 fn shore(water: i32, land: Ground, sea: Ground, x: i32, y: i32) -> u32 {

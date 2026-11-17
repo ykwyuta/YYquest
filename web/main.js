@@ -1,13 +1,15 @@
-const coordinateScale = 2;
+const gameHeight = 240;
 const canvas = document.querySelector("#game");
 const view = canvas.getContext("2d", { alpha: false });
 let image;
+let imagePixels;
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
 const status = document.querySelector("#status");
 const controls = document.querySelector("#controls");
 const stage = document.querySelector(".game-stage");
 const dpad = controls.querySelector(".directions");
+const actions = controls.querySelector(".actions");
 const touchLayout = document.querySelector("#touch-layout");
 const layoutPreference = "yyquest-touch-controls";
 const saveKey = "yyquest-adventure";
@@ -121,16 +123,22 @@ function resizeViewport() {
     if (getComputedStyle(controls).display === "contents") {
       const dpadWidth = dpad.offsetWidth;
       const columnGap = parseFloat(getComputedStyle(stage).columnGap) || 0;
-      available -= dpadWidth + stage.querySelector(".actions").offsetWidth;
+      available -= dpadWidth + actions.offsetWidth;
       available -= (dpadWidth ? 2 : 1) * columnGap;
     }
-    if (height > 0) width = Math.floor(240 * available / height);
+    if (height > 0) width = Math.floor(gameHeight * available / height);
   }
-  wasm.set_view_width(Math.max(320, width));
+  let minimapInset = 0;
+  if (stage.dataset.controls === "overlay" && canvas.clientHeight > 0 && !controls.hidden) {
+    const right = actions.offsetWidth + parseFloat(getComputedStyle(controls).paddingRight);
+    minimapInset = Math.ceil(right * gameHeight / canvas.clientHeight);
+  }
+  wasm.set_view_width(Math.max(320, width), minimapInset);
 }
 
 window.addEventListener("resize", resizeViewport);
 window.visualViewport?.addEventListener("resize", resizeViewport);
+new ResizeObserver(resizeViewport).observe(canvas);
 
 function animateTraffic(now) {
   pollGamepad();
@@ -173,21 +181,21 @@ const screen = {
       canvas.width = width;
       canvas.height = height;
       stage.style.setProperty("--canvas-ratio", width / height);
-      stage.style.setProperty("--canvas-limit", width > 640 ? "100%" : "840px");
+      stage.style.setProperty("--canvas-limit", width * 3 > height * 4 ? "100%" : "840px");
       image = view.createImageData(width, height);
+      imagePixels = new Uint32Array(image.data.buffer);
     }
     const pixels = new Uint32Array(wasm.memory.buffer, address, width * height);
     for (let i = 0; i < pixels.length; i++) {
       const rgb = pixels[i];
-      image.data[i * 4] = rgb >> 16;
-      image.data[i * 4 + 1] = rgb >> 8 & 255;
-      image.data[i * 4 + 2] = rgb & 255;
-      image.data[i * 4 + 3] = 255;
+      // Wasm stores RGB in a little-endian word while ImageData expects RGBA bytes.
+      imagePixels[i] = 0xff000000 | ((rgb & 255) << 16) | (rgb & 0xff00) | (rgb >>> 16);
     }
     view.putImageData(image, 0, 0);
   },
   text(x, y, size, color, address, length, serif) {
     const bytes = new Uint8Array(wasm.memory.buffer, address, length);
+    const coordinateScale = canvas.height / gameHeight;
     const face = serif
       ? '"Yu Mincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", serif'
       : '"Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif';
